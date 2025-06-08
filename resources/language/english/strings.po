@@ -1,0 +1,222 @@
+# Kodi Media Center language file
+# Addon Name: Kyivstar.tv
+# Addon id: script.service.kyivstar.tv
+# Addon Provider: tvhn
+#
+msgid ""
+msgstr ""
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-05-28 09:19+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#
+# Settings
+#
+
+# Account category
+msgctxt "#30000"
+msgid "Account"
+msgstr ""
+
+msgctxt "#30001"
+msgid "User information:"
+msgstr ""
+
+msgctxt "#30002"
+msgid "User:"
+msgstr ""
+
+msgctxt "#30003"
+msgid "Session ID:"
+msgstr ""
+
+msgctxt "#30004"
+msgid "Device information:"
+msgstr ""
+
+msgctxt "#30005"
+msgid "Device ID:"
+msgstr ""
+
+msgctxt "#30006"
+msgid "Logout"
+msgstr ""
+
+msgctxt "#30007"
+msgid "Login"
+msgstr ""
+
+# M3U category
+msgctxt "#30008"
+msgid "M3U"
+msgstr ""
+
+msgctxt "#30009"
+msgid "General"
+msgstr ""
+
+msgctxt "#30010"
+msgid "M3U Filename"
+msgstr ""
+
+msgctxt "#30011"
+msgid "Directory Path"
+msgstr ""
+
+# EPG category
+msgctxt "#30013"
+msgid "EPG"
+msgstr ""
+
+msgctxt "#30014"
+msgid "General"
+msgstr ""
+
+msgctxt "#30015"
+msgid "EPG Filename"
+msgstr ""
+
+msgctxt "#30016"
+msgid "Refresh options"
+msgstr ""
+
+msgctxt "#30017"
+msgid "Refresh once per day at the selected hour"
+msgstr ""
+
+msgctxt "#30018"
+msgid "Save options"
+msgstr ""
+
+msgctxt "#30019"
+msgid "Delay between groups of requests"
+msgstr ""
+
+msgctxt "#30020"
+msgid "Count of requests in one group"
+msgstr ""
+
+msgctxt "#30021"
+msgid "Stream"
+msgstr ""
+
+msgctxt "#30022"
+msgid "Video"
+msgstr ""
+
+msgctxt "#30023"
+msgid "Input stream type"
+msgstr ""
+
+# Interface
+
+# Login form
+msgctxt "#30100"
+msgid "Phone number"
+msgstr ""
+
+msgctxt "#30101"
+msgid "Personal account"
+msgstr ""
+
+msgctxt "#30102"
+msgid "Username:"
+msgstr ""
+
+msgctxt "#30103"
+msgid "Password:"
+msgstr ""
+
+msgctxt "#30104"
+msgid "Phonenumber:"
+msgstr ""
+
+msgctxt "#30105"
+msgid "Anonymous Login"
+msgstr ""
+
+msgctxt "#30106"
+msgid "Login"
+msgstr ""
+
+msgctxt "#30107"
+msgid "Cancel"
+msgstr ""
+
+msgctxt "#30110"
+msgid "Logout"
+msgstr ""
+
+msgctxt "#30111"
+msgid "Do you want to log out?"
+msgstr ""
+
+msgctxt "#30112"
+msgid "Yes"
+msgstr ""
+
+msgctxt "#30113"
+msgid "No"
+msgstr ""
+
+# Notifications
+msgctxt "#30200"
+msgid "For login you must set phonenumber."
+msgstr ""
+
+msgctxt "#30201"
+msgid "For login you must set username and password."
+msgstr ""
+
+msgctxt "#30202"
+msgid "Error during login. Check your logs for details."
+msgstr ""
+
+msgctxt "#30203"
+msgid "Error during logout. Check your logs for details."
+msgstr ""
+
+msgctxt "#30204"
+msgid "Log in to the plugin"
+msgstr ""
+
+msgctxt "#30205"
+msgid "Can not set new filename and path for epg file while previous saving process is not done."
+msgstr ""
+
+msgctxt "#30206"
+msgid "To save M3U list you must set path and name of file in settings."
+msgstr ""
+
+msgctxt "#30207"
+msgid "Error during list saving. Check your logs for details."
+msgstr ""
+
+msgctxt "#30208"
+msgid "Save M3U completed."
+msgstr ""
+
+msgctxt "#30209"
+msgid "M3U list does not exists."
+msgstr ""
+
+msgctxt "#30210"
+msgid "To save EPG you must set path and name of file in settings."
+msgstr ""
+
+msgctxt "#30211"
+msgid "Save EPG completed."
+msgstr ""
+
+msgctxt "#30212"
+msgid "Error during session status check. Check your logs for details."
+msgstr ""
+
+msgctxt "#30213"
+msgid "Inputstream addon does not found. Set value to default."
+msgstr ""
