@@ -71,6 +71,19 @@
                     <data>RunPlugin(plugin://plugin.video.kyivstar.tv/login)</data>
                     <control type="button" format="action" />
                 </setting>
+                <setting id="locale" type="string" label="30024" help="-1">
+                    <level>0</level>
+                    <default>uk_UA</default>
+                    <constraints>
+                        <options>
+                            <option>en_US</option>
+                            <option>uk_UA</option>
+                            <option>ru_RU</option>
+                        </options>
+                        <allowempty>false</allowempty>
+                    </constraints>
+                    <control type="list" format="string" />
+                </setting>
             </group>
             <group id="group_2" label="30004">
                 <setting id="device_id" type="string" label="30005" help="-1">

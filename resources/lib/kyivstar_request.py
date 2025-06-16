@@ -3,7 +3,7 @@ import xbmc
 from datetime import datetime, timedelta
 
 class KyivstarRequest:
-    def __init__(self, device_id):
+    def __init__(self, device_id, locale):
         self.base_api_url = "https://clients.production.vidmind.com/vidmind-stb-ws/{}"
         self.headers = headers = {
             'Origin': 'https://tv.kyivstar.ua',
@@ -11,7 +11,7 @@ class KyivstarRequest:
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:138.0) Gecko/20100101 Firefox/138.0',
             'x-vidmind-device-id': device_id,
             'x-vidmind-device-type': 'WEB',
-            'x-vidmind-locale': 'uk_UA',
+            'x-vidmind-locale': locale,
             }
 
 # Post requests
@@ -92,6 +92,24 @@ class KyivstarRequest:
             xbmc.log("KyivstarRequest exception in get_elem_cur_program_epg_data: " + str(e), xbmc.LOGERROR)
         finally:
             return epg_data
+
+    # locale: en_US, uk_UA, ru_RU
+    def change_locale(self, session_id, locale):
+        result = False
+        try:
+            url = self.base_api_url.format('subscribers/locale/change;jsessionid=%s' % session_id)
+            json_data = {
+                'locale':locale
+                }
+            response = requests.post(url, json=json_data, headers=self.headers)
+            if response.status_code == 204:
+                result = True
+            else:
+                response.raise_for_status()
+        except Exception as e:
+            xbmc.log("KyivstarRequest exception in change_locale: " + str(e), xbmc.LOGERROR)
+        finally:
+            return result
 
 # Get requests
 

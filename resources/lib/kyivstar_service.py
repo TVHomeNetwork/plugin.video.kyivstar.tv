@@ -20,9 +20,12 @@ class KyivstarServiceMonitor(xbmc.Monitor):
         self.path_epg = service.addon.getSetting('path_epg')
         self.name_epg = service.addon.getSetting('name_epg')
         self.inputstream = service.addon.getSetting('stream_inputstream')
+        self.locale = service.addon.getSetting('locale')
 
     def onSettingsChanged(self):
         service = self.service
+        session_id = service.addon.getSetting('session_id')
+
         path_m3u = service.addon.getSetting('path_m3u')
         name_m3u = service.addon.getSetting('name_m3u')
         if path_m3u != self.path_m3u or name_m3u != self.name_m3u:
@@ -55,6 +58,14 @@ class KyivstarServiceMonitor(xbmc.Monitor):
             else:
                 self.inputstream = inputstream
 
+        locale = service.addon.getSetting('locale')
+        if locale != self.locale:
+            # are we need send request?
+            if service.get_session_status() != KyivstarService.SESSION_EMPTY:
+                service.request.change_locale(session_id, locale)
+            service.request.headers['x-vidmind-locale'] = locale
+            self.locale = locale
+
 class KyivstarService:
     SESSION_EMPTY = "0"
     SESSION_ACTIVE = "1"
@@ -71,7 +82,9 @@ class KyivstarService:
             device_id = re.sub(r'[018]', num_rep, device_id)
             self.addon.setSetting('device_id', device_id)
 
-        self.request = KyivstarRequest(device_id)
+        locale = self.addon.getSetting('locale')
+
+        self.request = KyivstarRequest(device_id, locale)
         self.save_epg_index = -1
         self.refreshed = None
 

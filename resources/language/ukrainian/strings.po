@@ -51,6 +51,10 @@ msgctxt "#30007"
 msgid "Login"
 msgstr "Вхід до акаунту"
 
+msgctxt "#30024"
+msgid "Language:"
+msgstr "Мова:"
+
 # M3U category
 msgctxt "#30008"
 msgid "M3U"
