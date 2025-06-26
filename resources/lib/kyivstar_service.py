@@ -10,6 +10,7 @@ import xbmcvfs
 import xml.etree.ElementTree as etree
 
 from resources.lib.kyivstar_request import KyivstarRequest
+from resources.lib.live_stream_server import LiveStreamServer
 
 class KyivstarServiceMonitor(xbmc.Monitor):
     def __init__(self, service):
@@ -21,6 +22,9 @@ class KyivstarServiceMonitor(xbmc.Monitor):
         self.name_epg = service.addon.getSetting('name_epg')
         self.inputstream = service.addon.getSetting('stream_inputstream')
         self.locale = service.addon.getSetting('locale')
+        self.live_stream_server_enabled = service.addon.getSetting('live_stream_server_enabled')
+        self.live_stream_server_port = service.addon.getSetting('live_stream_server_port')
+        self.live_inputstream = service.addon.getSetting('live_stream_inputstream')
 
     def onSettingsChanged(self):
         service = self.service
@@ -65,6 +69,31 @@ class KyivstarServiceMonitor(xbmc.Monitor):
                 service.request.change_locale(session_id, locale)
             service.request.headers['x-vidmind-locale'] = locale
             self.locale = locale
+
+        live_stream_server_enabled = service.addon.getSetting('live_stream_server_enabled')
+        if live_stream_server_enabled != self.live_stream_server_enabled:
+            if live_stream_server_enabled == 'true':
+                service.live_stream_server.start()
+            else:
+                service.live_stream_server.stop()
+            self.live_stream_server_enabled = live_stream_server_enabled
+
+        live_stream_server_port = service.addon.getSetting('live_stream_server_port')
+        if live_stream_server_port != self.live_stream_server_port:
+            if service.live_stream_server.httpd.server_address[1] != int(live_stream_server_port):
+                service.live_stream_server.stop()
+                service.live_stream_server.start()
+            self.live_stream_server_port = live_stream_server_port
+
+        live_inputstream = service.addon.getSetting('live_stream_inputstream')
+        if live_inputstream != self.live_inputstream:
+            if xbmc.getCondVisibility('System.HasAddon(%s)' % inputstream) == 0:
+                loc_str = service.addon.getLocalizedString(30213) # 'Inputstream addon does not found. Set value to default.'
+                xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
+                service.addon.setSetting('live_stream_inputstream', 'default')
+                self.live_inputstream = 'default'
+            else:
+                self.live_inputstream = live_inputstream
 
 class KyivstarService:
     SESSION_EMPTY = "0"
@@ -333,6 +362,10 @@ class KyivstarService:
             if path_epg != '' and name_epg != '' and not xbmcvfs.exists(path_epg + name_epg):
                 self.save_epg()
 
+        self.live_stream_server = LiveStreamServer(self)
+        if self.addon.getSetting('live_stream_server_enabled') == 'true':
+            self.live_stream_server.start()
+
         while not monitor.abortRequested():
             try:
                 if self.save_epg_index >= 0:
@@ -375,4 +408,5 @@ class KyivstarService:
             except Exception as e:
                 exc_type, exc_obj, exc_tb = sys.exc_info()
                 xbmc.log("KyivstarService exception (line %s): %s" % (exc_tb.tb_lineno,str(e)), xbmc.LOGERROR)
-                
+
+        self.live_stream_server.stop()

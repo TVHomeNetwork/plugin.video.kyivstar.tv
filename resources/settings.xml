@@ -200,6 +200,41 @@
                     <control type="spinner" format="string"/>
                 </setting>
             </group>
+            <group id="group_8" label="30025">
+                <setting id="live_stream_server_enabled" type="boolean" label="30026" help="-1">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="live_stream_server_port" type="integer" label="30027" help="-1">
+                    <level>0</level>
+                    <default>38097</default>
+                    <constraints>
+                        <minimum>1</minimum>
+                        <step>1</step>
+                        <maximum>65535</maximum>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="enable" setting="live_stream_server_enabled" operator="is">true</dependency>
+                    </dependencies>
+                    <control type="edit" format="integer" />
+                </setting>
+                <setting id="live_stream_inputstream" type="string" label="30023" help="">
+                    <level>0</level>
+                    <default>default</default>
+                    <constraints>
+                        <options>
+                            <option>default</option>
+                            <option>inputstream.adaptive</option>
+                            <option>inputstream.ffmpegdirect</option>
+                        </options>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="enable" setting="live_stream_server_enabled" operator="is">true</dependency>
+                    </dependencies>
+                    <control type="spinner" format="string"/>
+                </setting>
+            </group>
         </category>
     </section>
 </settings>

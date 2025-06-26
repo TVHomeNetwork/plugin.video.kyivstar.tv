@@ -169,12 +169,12 @@ class KyivstarRequest:
         finally:
             return elements
 
-    def get_elem_epg_data(self, session_id, elem_id):
+    def get_elem_epg_data(self, session_id, elem_id, days_before=3, days_after=3):
         epg_datas = []
         try:
             now_date = datetime.now()
-            next_date = (now_date + timedelta(days=3)).strftime('%Y%m%d')
-            prev_date = (now_date - timedelta(days=3)).strftime('%Y%m%d')
+            next_date = (now_date + timedelta(days=days_after)).strftime('%Y%m%d')
+            prev_date = (now_date - timedelta(days=days_before)).strftime('%Y%m%d')
             url = self.base_api_url.format('livechannels/%s/epg;jsessionid=%s?from=%s&to=%s' % (elem_id, session_id, prev_date, next_date))
             response = requests.get(url, headers=self.headers)
             if response.status_code == 200:

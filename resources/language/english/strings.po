@@ -117,6 +117,18 @@ msgctxt "#30023"
 msgid "Input stream type"
 msgstr ""
 
+msgctxt "#30025"
+msgid "Live stream server for virtual channels"
+msgstr ""
+
+msgctxt "#30026"
+msgid "Enable server"
+msgstr ""
+
+msgctxt "#30027"
+msgid "Port number:"
+msgstr ""
+
 # Interface
 
 # Login form

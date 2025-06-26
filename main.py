@@ -255,22 +255,33 @@ def play(videoid):
 
     xbmc.log("KyivstarPlay: asset_id = %s, video_type = %s, epg_time = %s(%s)" % (videoid, video_type, epg, epg_str), xbmc.LOGINFO)
 
+    inputstream = service.addon.getSetting('stream_inputstream')
     url = ''
     if epg == 'null':
-        url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual)
-    elif virtual:
-        url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual, date=epg_time)
+        if virtual:
+            if service.addon.getSetting('live_stream_server_enabled') == 'true':
+                inputstream = service.addon.getSetting('live_stream_inputstream')
+                port = int(service.addon.getSetting('live_stream_server_port'))
+                url = 'http://127.0.0.1:%s/playlist.m3u8?asset=%s' % (port, videoid)
+            else:
+                url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual)
+        else:
+            url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual)
     else:
-        url = service.request.get_elem_playback_stream_url(user_id, session_id, videoid, epg_time)
+        if virtual:
+            url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual, date=epg_time)
+        else:
+            url = service.request.get_elem_playback_stream_url(user_id, session_id, videoid, epg_time)
 
-    url += '|User-Agent="%s"' % service.request.headers['User-Agent']
-    url += '&Referer="%s"' % service.request.headers['Referer']
+    if not url.startswith('http://127.0.0.1'):
+        url += '|User-Agent="%s"' % service.request.headers['User-Agent']
+        url += '&Referer="%s"' % service.request.headers['Referer']
+
     xbmc.log("KyivstarPlay: url = %s" % (url), xbmc.LOGINFO)
 
     play_item = xbmcgui.ListItem(path=url)
     play_item.setMimeType('application/vnd.apple.mpegurl')
 
-    inputstream = service.addon.getSetting('stream_inputstream')
     if inputstream != 'default':
         play_item.setProperty('inputstream', inputstream)
 

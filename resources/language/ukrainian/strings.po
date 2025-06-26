@@ -117,6 +117,18 @@ msgctxt "#30023"
 msgid "Input stream type"
 msgstr "Тип вхідного потоку"
 
+msgctxt "#30025"
+msgid "Live stream server for virtual channels"
+msgstr "Сервер прямої трансляції для віртуальних каналів"
+
+msgctxt "#30026"
+msgid "Enable server"
+msgstr "Увімкнути сервер"
+
+msgctxt "#30027"
+msgid "Port number:"
+msgstr "Номер порту:"
+
 # Interface
 
 # Login form
