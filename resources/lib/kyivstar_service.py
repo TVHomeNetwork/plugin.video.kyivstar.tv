@@ -54,7 +54,7 @@ class KyivstarServiceMonitor(xbmc.Monitor):
 
         inputstream = service.addon.getSetting('stream_inputstream')
         if inputstream != self.inputstream:
-            if xbmc.getCondVisibility('System.HasAddon(%s)' % inputstream) == 0:
+            if inputstream != 'default' and xbmc.getCondVisibility('System.HasAddon(%s)' % inputstream) == 0:
                 loc_str = service.addon.getLocalizedString(30213) # 'Inputstream addon does not found. Set value to default.'
                 xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
                 service.addon.setSetting('stream_inputstream', 'default')
@@ -87,7 +87,7 @@ class KyivstarServiceMonitor(xbmc.Monitor):
 
         live_inputstream = service.addon.getSetting('live_stream_inputstream')
         if live_inputstream != self.live_inputstream:
-            if xbmc.getCondVisibility('System.HasAddon(%s)' % inputstream) == 0:
+            if inputstream != 'default' and xbmc.getCondVisibility('System.HasAddon(%s)' % inputstream) == 0:
                 loc_str = service.addon.getLocalizedString(30213) # 'Inputstream addon does not found. Set value to default.'
                 xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
                 service.addon.setSetting('live_stream_inputstream', 'default')
