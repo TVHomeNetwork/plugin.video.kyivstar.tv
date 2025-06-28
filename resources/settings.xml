@@ -183,6 +183,11 @@
                     </constraints>
                     <control type="slider" format="integer" />
                 </setting>
+                <setting id="epg_include_description" type="boolean" label="30028" help="-1">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
             </group>
         </category>
         <category id="stream" label="30021">

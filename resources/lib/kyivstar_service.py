@@ -274,7 +274,11 @@ class KyivstarService:
         self.save_epg_xml_root = xml_root
         self.save_epg_assets = assets
         self.save_epg_index = 0
+        self.save_epg_include_desc = self.addon.getSetting('epg_include_description') == 'true'
         self.step_save_epg()
+
+    def strip_html(self, text):
+        return re.sub('<[^>]*?>', '', text)
 
     def step_save_epg(self):
         session_id = self.addon.getSetting('session_id')
@@ -316,6 +320,8 @@ class KyivstarService:
                         })
                     xml_program = etree.SubElement(xml_root, "programme", attrib=program_attrib)
                     etree.SubElement(xml_program, "title").text = program['title']
+                    if self.save_epg_include_desc:
+                        etree.SubElement(xml_program, "desc").text = self.strip_html(program['desc'])
             i += 1
         self.save_epg_index = i
 

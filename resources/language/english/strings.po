@@ -105,6 +105,11 @@ msgctxt "#30020"
 msgid "Count of requests in one group"
 msgstr ""
 
+msgctxt "#30028"
+msgid "Add a description to the programs"
+msgstr ""
+
+# Stream category
 msgctxt "#30021"
 msgid "Stream"
 msgstr ""
