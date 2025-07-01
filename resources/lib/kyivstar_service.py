@@ -30,25 +30,39 @@ class KyivstarServiceMonitor(xbmc.Monitor):
         service = self.service
         session_id = service.addon.getSetting('session_id')
 
+        m3u_start_saving = False
         path_m3u = service.addon.getSetting('path_m3u')
         name_m3u = service.addon.getSetting('name_m3u')
         if path_m3u != self.path_m3u or name_m3u != self.name_m3u:
-            if not xbmcvfs.exists(path_m3u + name_m3u):
-                service.save_m3u()
+            if path_m3u != '' and name_m3u != '':
+                self.service.m3u_file_path = path_m3u + name_m3u
+            else:
+                self.service.m3u_file_path = None
+            if self.service.m3u_file_path and not xbmcvfs.exists(self.service.m3u_file_path):
+                m3u_start_saving = True
             self.path_m3u = path_m3u
             self.name_m3u = name_m3u
 
+        cancel_epg_saving = None
         path_epg = service.addon.getSetting('path_epg')
         name_epg = service.addon.getSetting('name_epg')
         if path_epg != self.path_epg or name_epg != self.name_epg:
             if service.save_epg_index >= 0:
-                loc_str = service.addon.getLocalizedString(30205) # 'Can not set new filename and path for epg file while previous saving process is not done.'
-                xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
+                loc_str_1 = service.addon.getLocalizedString(30114) # 'Warning'
+                loc_str_2 = service.addon.getLocalizedString(30115) # 'This will cancel the EPG save process that is not yet complete. Continue?'
+                loc_str_3 = service.addon.getLocalizedString(30112) # 'Yes'
+                loc_str_4 = service.addon.getLocalizedString(30113) # 'No'
+                cancel_epg_saving = xbmcgui.Dialog().yesno(loc_str_1, loc_str_2, yeslabel=loc_str_3, nolabel=loc_str_4)
+            if cancel_epg_saving == False:
                 service.addon.setSetting('path_epg', self.path_epg)
                 service.addon.setSetting('name_epg', self.name_epg)
                 return
-            elif not xbmcvfs.exists(path_epg + name_epg):
-                service.save_epg()
+            if path_epg != '' and name_epg != '':
+                self.service.epg_file_path = path_epg + name_epg
+            else:
+                self.service.epg_file_path = None
+            if self.service.epg_file_path and not xbmcvfs.exists(self.service.epg_file_path):
+                service.epg_start_saving = True
             self.path_epg = path_epg
             self.name_epg = name_epg
 
@@ -64,11 +78,24 @@ class KyivstarServiceMonitor(xbmc.Monitor):
 
         locale = service.addon.getSetting('locale')
         if locale != self.locale:
+            if service.save_epg_index >= 0 and cancel_epg_saving == None:
+                loc_str_1 = service.addon.getLocalizedString(30114) # 'Warning'
+                loc_str_2 = service.addon.getLocalizedString(30115) # 'This will cancel the EPG save process that is not yet complete. Continue?'
+                loc_str_3 = service.addon.getLocalizedString(30112) # 'Yes'
+                loc_str_4 = service.addon.getLocalizedString(30113) # 'No'
+                cancel_epg_saving = xbmcgui.Dialog().yesno(loc_str_1, loc_str_2, yeslabel=loc_str_3, nolabel=loc_str_4)
+            if cancel_epg_saving == False:
+                service.addon.setSetting('locale', self.locale)
+                return
             # are we need send request?
             if service.get_session_status() != KyivstarService.SESSION_EMPTY:
                 service.request.change_locale(session_id, locale)
             service.request.headers['x-vidmind-locale'] = locale
             self.locale = locale
+            if self.service.m3u_file_path:
+                m3u_start_saving = True
+            if self.service.epg_file_path:
+                service.epg_start_saving = True
 
         live_stream_server_enabled = service.addon.getSetting('live_stream_server_enabled')
         if live_stream_server_enabled != self.live_stream_server_enabled:
@@ -95,6 +122,9 @@ class KyivstarServiceMonitor(xbmc.Monitor):
             else:
                 self.live_inputstream = live_inputstream
 
+        if m3u_start_saving:
+            service.save_m3u()
+
 class KyivstarService:
     SESSION_EMPTY = "0"
     SESSION_ACTIVE = "1"
@@ -114,6 +144,21 @@ class KyivstarService:
         locale = self.addon.getSetting('locale')
 
         self.request = KyivstarRequest(device_id, locale)
+
+        self.m3u_file_path = None
+        path_m3u = self.addon.getSetting('path_m3u')
+        name_m3u = self.addon.getSetting('name_m3u')
+        if path_m3u != '' and name_m3u != '':
+            self.m3u_file_path = path_m3u + name_m3u
+
+        self.epg_file_path = None
+        path_epg = self.addon.getSetting('path_epg')
+        name_epg = self.addon.getSetting('name_epg')
+        if path_epg != '' and name_epg != '':
+            self.epg_file_path = path_epg + name_epg
+
+        self.epg_start_saving = False
+
         self.save_epg_index = -1
         self.refreshed = None
 
@@ -148,13 +193,12 @@ class KyivstarService:
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
             return
 
-        path_m3u = self.addon.getSetting('path_m3u')
-        name_m3u = self.addon.getSetting('name_m3u')
-
-        if path_m3u == '' or name_m3u == '':
+        if not self.m3u_file_path:
             loc_str = self.addon.getLocalizedString(30206) # 'To save M3U list you must set path and name of file in settings.'
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
             return
+
+        xbmc.log("KyivstarService: Saving M3U started.", xbmc.LOGDEBUG)
 
         session_id = self.addon.getSetting('session_id')
 
@@ -206,12 +250,19 @@ class KyivstarService:
             data += '#EXTINF:0 tvg-id="%s" tvg-name="%s" tvg-logo="%s" %s,%s\n' % (channel_asset_id, channel_name, channel_logo, channel_catchup, channel_name)
             data += 'plugin://plugin.video.kyivstar.tv/play/%s-%s|null\n' % (channel_asset_id, channel_type)
 
-        f = xbmcvfs.File(path_m3u + name_m3u, 'w')
+        # If we write data stright to the 'self.m3u_file_path' file, pvr.iptvsimple can stuck on updating channels.
+        temp = xbmcvfs.translatePath('special://temp') + 'test.m3u'
+
+        f = xbmcvfs.File(temp, 'w')
         f.write(data.encode("utf-8"))
         f.close()
 
+        xbmcvfs.copy(temp, self.m3u_file_path)
+        xbmcvfs.delete(temp)
+
         loc_str = self.addon.getLocalizedString(30208) # 'Save M3U completed.'
         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
+        xbmc.log("KyivstarService: Saving M3U completed.", xbmc.LOGDEBUG)
 
     def save_epg(self):
         if self.get_session_status() == KyivstarService.SESSION_EMPTY:
@@ -219,25 +270,25 @@ class KyivstarService:
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
             return
 
-        path_m3u = self.addon.getSetting('path_m3u')
-        name_m3u = self.addon.getSetting('name_m3u')
-
-        if not xbmcvfs.exists(path_m3u + name_m3u):
+        if not self.m3u_file_path:
             loc_str = self.addon.getLocalizedString(30209) # 'M3U list does not exists.'
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
             return
 
-        path_epg = self.addon.getSetting('path_epg')
-        name_epg = self.addon.getSetting('name_epg')
+        if not xbmcvfs.exists(self.m3u_file_path):
+            loc_str = self.addon.getLocalizedString(30209) # 'M3U list does not exists.'
+            xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
+            return
 
-        if path_epg == '' or name_epg == '':
+        if not self.epg_file_path:
             loc_str = self.addon.getLocalizedString(30210) # 'To save EPG you must set path and name of file in settings.'
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
             return
 
+        xbmc.log("KyivstarService: Saving EPG started.", xbmc.LOGDEBUG)
         xml_root = etree.Element("tv")
 
-        f = xbmcvfs.File(path_m3u + name_m3u)
+        f = xbmcvfs.File(self.m3u_file_path)
         m3u_list = f.read().split('\n')
         f.close()
 
@@ -274,6 +325,7 @@ class KyivstarService:
         self.save_epg_xml_root = xml_root
         self.save_epg_assets = assets
         self.save_epg_index = 0
+        self.save_epg_file_path = self.epg_file_path
         self.save_epg_include_desc = self.addon.getSetting('epg_include_description') == 'true'
         self.step_save_epg()
 
@@ -333,10 +385,7 @@ class KyivstarService:
 
         epg_list = '<?xml version="1.0" encoding="utf-8"?>\n'.encode("utf-8") + etree.tostring(xml_root, encoding='utf-8')
 
-        path_epg = self.addon.getSetting('path_epg')
-        name_epg = self.addon.getSetting('name_epg')
-
-        f = xbmcvfs.File(path_epg + name_epg, 'w')
+        f = xbmcvfs.File(self.save_epg_file_path, 'w')
         f.write(epg_list)
         f.close()
 
@@ -346,6 +395,7 @@ class KyivstarService:
 
         loc_str = self.addon.getLocalizedString(30211) # 'Save EPG completed.'
         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
+        xbmc.log("KyivstarService: Saving EPG completed.", xbmc.LOGDEBUG)
 
     def run(self):
         monitor = KyivstarServiceMonitor(self)
@@ -359,14 +409,10 @@ class KyivstarService:
             check_session_timer = int(time.time())
 
         if self.get_session_status() != KyivstarService.SESSION_EMPTY:
-            path_m3u = self.addon.getSetting('path_m3u')
-            name_m3u = self.addon.getSetting('name_m3u')
-            if path_m3u != '' and name_m3u != '' and not xbmcvfs.exists(path_m3u + name_m3u):
+            if self.m3u_file_path and not xbmcvfs.exists(self.m3u_file_path):
                 self.save_m3u()
-            path_epg = self.addon.getSetting('path_epg')
-            name_epg = self.addon.getSetting('name_epg')
-            if path_epg != '' and name_epg != '' and not xbmcvfs.exists(path_epg + name_epg):
-                self.save_epg()
+            if self.epg_file_path and not xbmcvfs.exists(self.epg_file_path):
+                self.epg_start_saving = True
 
         self.live_stream_server = LiveStreamServer(self)
         if self.addon.getSetting('live_stream_server_enabled') == 'true':
@@ -391,19 +437,24 @@ class KyivstarService:
                     if self.refreshed:
                         refresh_day = self.refreshed.tm_mday
                     refresh_hour = self.addon.getSettingInt('epg_refresh_hour')
-                    if current_time.tm_hour >= refresh_hour and current_time.tm_mday != refresh_day:
-                        path_epg = self.addon.getSetting('path_epg')
-                        name_epg = self.addon.getSetting('name_epg')
-                        if path_epg != '' and name_epg != '':
-                            if not xbmcvfs.exists(path_epg + name_epg):
-                                xbmc.log("KyivstarService: refresh_epg creating new file", xbmc.LOGINFO)
-                                self.save_epg()
-                            else:
-                                st = xbmcvfs.Stat(path_epg + name_epg)
-                                self.refreshed = time.localtime(st.st_mtime())
-                                if current_time.tm_mday != self.refreshed.tm_mday:
-                                    xbmc.log("KyivstarService: refresh_epg updating old file", xbmc.LOGINFO)
-                                    self.save_epg()
+                    if self.epg_file_path and current_time.tm_hour >= refresh_hour and current_time.tm_mday != refresh_day:
+                        if not xbmcvfs.exists(self.epg_file_path):
+                            xbmc.log("KyivstarService: refresh_epg creating new file", xbmc.LOGINFO)
+                            self.epg_start_saving = True
+                        else:
+                            st = xbmcvfs.Stat(self.epg_file_path)
+                            self.refreshed = time.localtime(st.st_mtime())
+                            if current_time.tm_mday != self.refreshed.tm_mday:
+                                xbmc.log("KyivstarService: refresh_epg updating old file", xbmc.LOGINFO)
+                                self.epg_start_saving = True
+
+                if self.epg_start_saving:
+                    self.epg_start_saving = False
+                    if self.save_epg_index >= 0:
+                        self.save_epg_index = -1
+                        del self.save_epg_xml_root
+                        del self.save_epg_assets
+                    self.save_epg()
 
                 wait_time = 60
                 if self.save_epg_index >= 0:

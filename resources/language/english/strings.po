@@ -185,6 +185,14 @@ msgctxt "#30113"
 msgid "No"
 msgstr ""
 
+msgctxt "#30114"
+msgid "Warning"
+msgstr ""
+
+msgctxt "#30115"
+msgid "This will cancel the EPG save process that is not yet complete. Continue?"
+msgstr ""
+
 # Notifications
 msgctxt "#30200"
 msgid "For login you must set phonenumber."
