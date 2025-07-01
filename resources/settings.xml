@@ -204,6 +204,36 @@
                     </constraints>
                     <control type="spinner" format="string"/>
                 </setting>
+                <setting id="configure_inputstream_adaptive" type="action" label="30029" help="-1">
+                    <level>0</level>
+                    <dependencies>
+                        <dependency type="visible">
+                            <and>
+                                <condition setting="stream_inputstream">inputstream.adaptive</condition>
+                                <condition name="InfoBool" on="property">System.HasAddon(inputstream.adaptive)</condition>
+                            </and>
+                        </dependency>
+                    </dependencies>
+                    <data>Addon.OpenSettings(inputstream.adaptive)</data>
+                    <control type="button" format="action">
+                        <close>true</close>
+                    </control>
+                </setting>
+                <setting id="configure_inputstream_ffmpegdirect" type="action" label="30030" help="-1">
+                    <level>0</level>
+                    <dependencies>
+                        <dependency type="visible">
+                            <and>
+                                <condition setting="stream_inputstream">inputstream.ffmpegdirect</condition>
+                                <condition name="InfoBool" on="property">System.HasAddon(inputstream.ffmpegdirect)</condition>
+                            </and>
+                        </dependency>
+                    </dependencies>
+                    <data>Addon.OpenSettings(inputstream.ffmpegdirect)</data>
+                    <control type="button" format="action">
+                        <close>true</close>
+                    </control>
+                </setting>
             </group>
             <group id="group_8" label="30025">
                 <setting id="live_stream_server_enabled" type="boolean" label="30026" help="-1">

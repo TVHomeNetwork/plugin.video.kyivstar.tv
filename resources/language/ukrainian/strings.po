@@ -122,6 +122,14 @@ msgctxt "#30023"
 msgid "Input stream type"
 msgstr "Тип вхідного потоку"
 
+msgctxt "#30029"
+msgid "Open inputstream.adaptive settings"
+msgstr "Відкрити налаштування inputstream.adaptive"
+
+msgctxt "#30030"
+msgid "Open inputstream.ffmpegdirect settings"
+msgstr "Відкрити налаштування inputstream.ffmpegdirect"
+
 msgctxt "#30025"
 msgid "Live stream server for virtual channels"
 msgstr "Сервер прямої трансляції для віртуальних каналів"
