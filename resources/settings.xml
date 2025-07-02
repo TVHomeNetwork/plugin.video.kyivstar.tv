@@ -269,6 +269,14 @@
                     </dependencies>
                     <control type="spinner" format="string"/>
                 </setting>
+                <setting id="remove_ads_in_catchup_mode" type="boolean" label="30031" help="-1">
+                    <level>0</level>
+                    <default>false</default>
+                    <dependencies>
+                        <dependency type="enable" setting="live_stream_server_enabled" operator="is">true</dependency>
+                    </dependencies>
+                    <control type="toggle" />
+                </setting>
             </group>
         </category>
     </section>

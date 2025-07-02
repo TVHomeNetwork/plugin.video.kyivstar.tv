@@ -8,9 +8,10 @@ from urllib.parse import urlparse, parse_qs
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 class KyivstarStreamManager(object):
-    def __init__(self, server, asset_id):
+    def __init__(self, server, asset_id, epg):
         self.server = server
         self.asset_id = asset_id
+        self.epg = epg
         self.service = server.service
 
         self.headers = {
@@ -36,7 +37,10 @@ class KyivstarStreamManager(object):
 
     def parse_playlist(self, text):
         server_address = self.server.server_address
-        base_url = "http://%s:%s/chunklist.m3u8?url={}" % (server_address[0], server_address[1])
+        live = 'live&'
+        if self.epg:
+            live = ''
+        base_url = "http://%s:%s/chunklist.m3u8?%surl={}" % (server_address[0], server_address[1], live)
         hls = {}
         bandwidth = -1
         resolution = ''
@@ -66,7 +70,7 @@ class KyivstarStreamManager(object):
         session_id = service.addon.getSetting('session_id')
         user_id = service.addon.getSetting('user_id')
 
-        stream_url = service.request.get_elem_stream_url(user_id, session_id, asset_id, virtual=True)
+        stream_url = service.request.get_elem_stream_url(user_id, session_id, asset_id, virtual=True, date=self.epg)
         if stream_url == '':
             return None
 
@@ -76,6 +80,9 @@ class KyivstarStreamManager(object):
 
         self.hls, text = self.parse_playlist(text)
         content = text.encode('utf-8')
+
+        if self.epg:
+            return content
 
         epg_data = service.request.get_elem_epg_data(session_id, asset_id, days_before=0, days_after=1)
         if len(epg_data) != 2: 
@@ -206,7 +213,7 @@ class KyivstarStreamManager(object):
                 break
         return index
 
-    def get_chunklist_content(self, stream_url):
+    def get_chunklist_content(self, stream_url, live):
         stream_data = self.hls[stream_url]
 
         if 'chunks' not in stream_data:
@@ -252,6 +259,11 @@ class KyivstarStreamManager(object):
         else:
             start = index - 20
             end = index + 1
+
+            if not live:
+                start = 0
+                end = len(chunks)
+
             if start < 0:
                 if 'prev-chunks' in stream_data:
                     prev_end = len(stream_data['prev-chunks'])
@@ -266,11 +278,14 @@ class KyivstarStreamManager(object):
                     start = 0
             for i in range(start, end):
                 chunk = chunks[i]
-                chunklist += '#EXT-X-PROGRAM-DATE-TIME:%s\n' % time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime(chunk['start']))
+                if live:
+                    chunklist += '#EXT-X-PROGRAM-DATE-TIME:%s\n' % time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime(chunk['start']))
                 for option in chunk['options']:
                     chunklist += option + '\n'
                 chunklist += chunk['url'] + '\n'
                 #xbmc.log("KyivstarStreamManager: stream_data chunk url=%s" % (chunk['url']), xbmc.LOGDEBUG)
+            if not live:
+                chunklist += '#EXT-X-ENDLIST\n'
 
         return chunklist.encode('utf-8')
 
@@ -283,15 +298,23 @@ class HttpGetHandler(BaseHTTPRequestHandler):
         if url.path == '/playlist.m3u8':
             query = parse_qs(url.query)
             asset_id = query['asset'][0]
+            epg = query.get('epg', None)
+            if epg:
+                epg = epg[0]
 
             if hasattr(self.server, 'manager'):
                 delattr(self.server, 'manager')
 
-            self.server.manager = KyivstarStreamManager(self.server, asset_id)
+            self.server.manager = KyivstarStreamManager(self.server, asset_id, epg)
             content = self.server.manager.get_playlist_content()
         elif url.path == '/chunklist.m3u8':
-            stream_url = url.query[4:]
-            content = self.server.manager.get_chunklist_content(stream_url)
+            live = False
+            strip_length = 4
+            if url.query.startswith('live&'):
+                live = True
+                strip_length += 5
+            stream_url = url.query[strip_length:]
+            content = self.server.manager.get_chunklist_content(stream_url, live)
 
         if content:
             self.send_response(200)

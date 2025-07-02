@@ -269,7 +269,11 @@ def play(videoid):
             url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual)
     else:
         if virtual:
-            url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual, date=epg_time)
+            if service.addon.getSetting('remove_ads_in_catchup_mode') == 'true':
+                port = int(service.addon.getSetting('live_stream_server_port'))
+                url = 'http://127.0.0.1:%s/playlist.m3u8?asset=%s&epg=%s' % (port, videoid, epg_time)
+            else:
+                url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual, date=epg_time)
         else:
             url = service.request.get_elem_playback_stream_url(user_id, session_id, videoid, epg_time)
 

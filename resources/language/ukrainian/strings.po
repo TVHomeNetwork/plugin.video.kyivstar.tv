@@ -142,6 +142,10 @@ msgctxt "#30027"
 msgid "Port number:"
 msgstr "Номер порту:"
 
+msgctxt "#30031"
+msgid "Remove ads in catchup mode"
+msgstr "Видалити рекламу в режимі наздоганяння"
+
 # Interface
 
 # Login form

@@ -142,6 +142,10 @@ msgctxt "#30027"
 msgid "Port number:"
 msgstr ""
 
+msgctxt "#30031"
+msgid "Remove ads in catchup mode"
+msgstr ""
+
 # Interface
 
 # Login form
