@@ -292,5 +292,19 @@
                 </setting>
             </group>
         </category>
+        <category id="iptv_simple_client" label="30034">
+            <group id="group_9" label="30035">
+                <setting id="iptv_sc_reload_when_m3u_saved" type="boolean" label="30036" help="-1">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="iptv_sc_reload_when_epg_saved" type="boolean" label="30037" help="-1">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+            </group>
+        </category>
     </section>
 </settings>

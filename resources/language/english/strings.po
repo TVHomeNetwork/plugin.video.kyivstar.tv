@@ -154,6 +154,23 @@ msgctxt "#30031"
 msgid "Remove ads in catchup mode"
 msgstr ""
 
+# IPTV Simple Client category
+msgctxt "#30034"
+msgid "IPTV Simple Client"
+msgstr ""
+
+msgctxt "#30035"
+msgid "General"
+msgstr ""
+
+msgctxt "#30036"
+msgid "Reload IPTV Simple Client each time when M3U updated"
+msgstr ""
+
+msgctxt "#30037"
+msgid "Reload IPTV Simple Client each time when EPG updated"
+msgstr ""
+
 # Interface
 
 # Login form

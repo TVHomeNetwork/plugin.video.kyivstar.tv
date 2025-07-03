@@ -305,6 +305,11 @@ class KyivstarService:
         xbmcvfs.copy(temp, self.m3u_file_path)
         xbmcvfs.delete(temp)
 
+        if self.addon.getSetting('iptv_sc_reload_when_m3u_saved') == 'true':
+            xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":false}}')
+            time.sleep(1)
+            xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":true}}')
+
         loc_str = self.addon.getLocalizedString(30208) # 'Save M3U completed.'
         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
         xbmc.log("KyivstarService: Saving M3U completed.", xbmc.LOGDEBUG)
@@ -437,6 +442,11 @@ class KyivstarService:
         self.save_epg_index = -1
         del self.save_epg_xml_root
         del self.save_epg_assets
+
+        if self.addon.getSetting('iptv_sc_reload_when_epg_saved') == 'true':
+            xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":false}}')
+            time.sleep(1)
+            xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":true}}')
 
         loc_str = self.addon.getLocalizedString(30211) # 'Save EPG completed.'
         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
