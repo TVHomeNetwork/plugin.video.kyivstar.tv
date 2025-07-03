@@ -4,7 +4,7 @@ import threading
 
 import xbmc
 
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urljoin
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 class KyivstarStreamManager(object):
@@ -28,14 +28,14 @@ class KyivstarStreamManager(object):
         try:
             response = requests.get(url, headers=self.headers)
             if response.status_code == 200:
-                return response.text
+                return response
             else:
                 response.raise_for_status()
         except Exception as e:
             xbmc.log("KyivstarStreamManager exception on loading %s: %s" % (url, str(e)), xbmc.LOGERROR)
             return None
 
-    def parse_playlist(self, text):
+    def parse_playlist(self, text, playlist_url):
         server_address = self.server.server_address
         live = 'live&'
         if self.epg:
@@ -53,6 +53,8 @@ class KyivstarStreamManager(object):
                     elif pair.startswith('RESOLUTION'):
                         resolution = pair.split('=')[1]
             if not line.startswith('#'):
+                if not line.startswith('https://'):
+                    line = urljoin(playlist_url, line)
                 lines[index] = base_url.format(line)
                 hls[line] = {
                     'url' : line,
@@ -74,11 +76,15 @@ class KyivstarStreamManager(object):
         if stream_url == '':
             return None
 
-        text = self.download(stream_url)
-        if not text:
+        response = self.download(stream_url)
+        if not response:
             return None
+        text = response.text
+        playlist_url = stream_url
+        if len(response.history) > 0:
+            playlist_url = response.history[0].headers['Location']
 
-        self.hls, text = self.parse_playlist(text)
+        self.hls, text = self.parse_playlist(text, playlist_url)
         content = text.encode('utf-8')
 
         if self.epg:
@@ -122,9 +128,11 @@ class KyivstarStreamManager(object):
 
             playlist_url = self.service.request.get_elem_stream_url(user_id, session_id, asset_id, virtual=True, date=date)
             if playlist_url != '':
-                text = self.download(playlist_url)
-                if text:
-                    hls, _ = self.parse_playlist(text)
+                response = self.download(playlist_url)
+                if response:
+                    if len(response.history) > 0:
+                        playlist_url = response.history[0].headers['Location']
+                    hls, _ = self.parse_playlist(response.text, playlist_url)
                     new_stream_url = None
                     for url in hls:
                         if hls[url]['resolution'] == stream_data['resolution']:
@@ -145,12 +153,12 @@ class KyivstarStreamManager(object):
             stream_data['chunks'] = []
             return
 
-        text = self.download(stream_url)
-        if not text:
+        response = self.download(stream_url)
+        if not response:
             stream_data['chunks'] = []
             return
 
-        lines = text.splitlines()
+        lines = response.text.splitlines()
         chunks = []
         chunk_options = []
 
@@ -181,6 +189,8 @@ class KyivstarStreamManager(object):
             elif line.startswith('https://adroll.production.vidmind.com'):
                 chunk_options = []
             elif not line.startswith('#'):
+                if not line.startswith('https://'):
+                    line = urljoin(stream_url, line)
                 chunks.append({
                     'url' : line,
                     'options' : chunk_options,
