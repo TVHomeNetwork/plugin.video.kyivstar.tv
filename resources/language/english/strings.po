@@ -72,6 +72,14 @@ msgctxt "#30011"
 msgid "Directory Path"
 msgstr ""
 
+msgctxt "#30032"
+msgid "Include Kyivstar.TV channels groups to M3U file"
+msgstr ""
+
+msgctxt "#30033"
+msgid "Include Favorites group with regular groups"
+msgstr ""
+
 # EPG category
 msgctxt "#30013"
 msgid "EPG"

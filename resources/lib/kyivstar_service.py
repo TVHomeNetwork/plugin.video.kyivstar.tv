@@ -25,6 +25,8 @@ class KyivstarServiceMonitor(xbmc.Monitor):
         self.live_stream_server_enabled = service.addon.getSetting('live_stream_server_enabled')
         self.live_stream_server_port = service.addon.getSetting('live_stream_server_port')
         self.live_inputstream = service.addon.getSetting('live_stream_inputstream')
+        self.m3u_include_kyivstar_groups = service.addon.getSetting('m3u_include_kyivstar_groups')
+        self.m3u_include_favorites_group = service.addon.getSetting('m3u_include_favorites_group')
 
     def onSettingsChanged(self):
         service = self.service
@@ -122,6 +124,18 @@ class KyivstarServiceMonitor(xbmc.Monitor):
             else:
                 self.live_inputstream = live_inputstream
 
+        m3u_include_kyivstar_groups = service.addon.getSetting('m3u_include_kyivstar_groups')
+        if m3u_include_kyivstar_groups != self.m3u_include_kyivstar_groups:
+            if self.service.m3u_file_path:
+                m3u_start_saving = True
+            self.m3u_include_kyivstar_groups = m3u_include_kyivstar_groups
+
+        m3u_include_favorites_group = service.addon.getSetting('m3u_include_favorites_group')
+        if m3u_include_favorites_group != self.m3u_include_favorites_group:
+            if self.service.m3u_file_path:
+                m3u_start_saving = True
+            self.m3u_include_favorites_group = m3u_include_favorites_group
+
         if m3u_start_saving:
             service.save_m3u()
 
@@ -210,8 +224,35 @@ class KyivstarService:
             self.set_session_status(KyivstarService.SESSION_INACTIVE)
             return
 
-        all_channels_group_id = groups[0].get('assetId', None)
-        all_channels = self.request.get_group_elems(session_id, all_channels_group_id)
+        all_channels = {}
+        include_groups = self.addon.getSetting('m3u_include_kyivstar_groups') == 'true'
+        include_favorites_group = self.addon.getSetting('m3u_include_favorites_group') == 'true'
+
+        for group in groups:
+            group_id = group.get('assetId', None)
+            group_name = group.get('name', None)
+            group_type = group.get('type', None) # ALL_CHANNELS, FAVORITES, REGULAR
+            if group_id is None:
+                continue
+            if not include_groups and group_type != 'ALL_CHANNELS':
+                continue
+            if not include_favorites_group and group_type == 'FAVORITES':
+                continue
+            channels = self.request.get_group_elems(session_id, group_id)
+            for channel in channels:
+                asset_id = channel.get('assetId', None)
+                if asset_id is None:
+                    continue
+                if asset_id not in all_channels:
+                    all_channels[asset_id] = channel
+                channel = all_channels[asset_id]
+                if group_type == 'ALL_CHANNELS':
+                    continue
+                if 'groups' not in channel:
+                    channel['groups'] = group_name
+                else:
+                    channel['groups'] += ';' + group_name
+            time.sleep(0.1)
 
         if len(all_channels) == 0:
             loc_str = self.addon.getLocalizedString(30207) # 'Error during list saving. Check your logs for details.'
@@ -220,7 +261,7 @@ class KyivstarService:
             return
 
         data = '#EXTM3U\n'
-        for channel in all_channels:
+        for channel in all_channels.values():
             if not channel.get('purchased', None):
                 continue
 
@@ -240,6 +281,10 @@ class KyivstarService:
             if ctype:
                 channel_type = ctype.get('value', None)
 
+            channel_groups = ''
+            if include_groups:
+                channel_groups = 'group-title="%s"' % channel.get('groups', None)
+
             channel_catchup = ''
             if channel.get('catchupEnabled', None):
                 if channel_type == 'IP':
@@ -247,7 +292,7 @@ class KyivstarService:
                 else:
                     channel_catchup = 'catchup="vod" catchup-source="plugin://plugin.video.kyivstar.tv/play/%s-%s|{catchup-id}"' % (channel_asset_id, channel_type)
 
-            data += '#EXTINF:0 tvg-id="%s" tvg-name="%s" tvg-logo="%s" %s,%s\n' % (channel_asset_id, channel_name, channel_logo, channel_catchup, channel_name)
+            data += '#EXTINF:0 tvg-id="%s" tvg-name="%s" tvg-logo="%s" %s %s,%s\n' % (channel_asset_id, channel_name, channel_logo, channel_groups, channel_catchup, channel_name)
             data += 'plugin://plugin.video.kyivstar.tv/play/%s-%s|null\n' % (channel_asset_id, channel_type)
 
         # If we write data stright to the 'self.m3u_file_path' file, pvr.iptvsimple can stuck on updating channels.

@@ -119,6 +119,19 @@
                         <heading>30011</heading>
                     </control>
                 </setting>
+                <setting id="m3u_include_kyivstar_groups" type="boolean" label="30032" help="-1">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="m3u_include_favorites_group" type="boolean" label="30033" help="-1">
+                    <level>0</level>
+                    <default>false</default>
+                    <dependencies>
+                        <dependency type="enable" setting="m3u_include_kyivstar_groups" operator="is">true</dependency>
+                    </dependencies>
+                    <control type="toggle" />
+                </setting>
             </group>
         </category>
         <category id="epg" label="30013">
