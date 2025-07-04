@@ -256,6 +256,9 @@ class KyivstarStreamManager(object):
         #    stream_data['discontinuity-sequence'] += 1
         #stream_data['discontinuity-count'] = discontinuity_count
 
+        if index < 20 and 'prev-chunks' not in stream_data:
+            stream_data['sequence'] = 0
+
         xbmc.log("KyivstarStreamManager: stream_data (res:%s) index=%s(%s), sequence=%s, discontinuity-sequence=%s" % (stream_data['resolution'],
             stream_data['index'], len(stream_data['chunks']), stream_data['sequence'], stream_data['discontinuity-sequence']), xbmc.LOGDEBUG)
 
