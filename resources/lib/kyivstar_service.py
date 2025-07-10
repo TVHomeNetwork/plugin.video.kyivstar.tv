@@ -11,6 +11,7 @@ import xml.etree.ElementTree as etree
 
 from resources.lib.kyivstar_request import KyivstarRequest
 from resources.lib.live_stream_server import LiveStreamServer
+from resources.lib.channel_manager import ChannelManager
 
 class KyivstarServiceMonitor(xbmc.Monitor):
     def __init__(self, service):
@@ -213,94 +214,18 @@ class KyivstarService:
             return
 
         xbmc.log("KyivstarService: Saving M3U started.", xbmc.LOGDEBUG)
+        channel_manager = ChannelManager()
 
-        session_id = self.addon.getSetting('session_id')
-
-        groups = self.request.get_live_channels_groups(session_id)
-
-        if len(groups) == 0:
+        if not channel_manager.download(self):
             loc_str = self.addon.getLocalizedString(30207) # 'Error during list saving. Check your logs for details.'
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
             self.set_session_status(KyivstarService.SESSION_INACTIVE)
             return
-
-        all_channels = {}
-        include_groups = self.addon.getSetting('m3u_include_kyivstar_groups') == 'true'
-        include_favorites_group = self.addon.getSetting('m3u_include_favorites_group') == 'true'
-
-        for group in groups:
-            group_id = group.get('assetId', None)
-            group_name = group.get('name', None)
-            group_type = group.get('type', None) # ALL_CHANNELS, FAVORITES, REGULAR
-            if group_id is None:
-                continue
-            if not include_groups and group_type != 'ALL_CHANNELS':
-                continue
-            if not include_favorites_group and group_type == 'FAVORITES':
-                continue
-            channels = self.request.get_group_elems(session_id, group_id)
-            for channel in channels:
-                asset_id = channel.get('assetId', None)
-                if asset_id is None:
-                    continue
-                if asset_id not in all_channels:
-                    all_channels[asset_id] = channel
-                channel = all_channels[asset_id]
-                if group_type == 'ALL_CHANNELS':
-                    continue
-                if 'groups' not in channel:
-                    channel['groups'] = group_name
-                else:
-                    channel['groups'] += ';' + group_name
-            time.sleep(0.1)
-
-        if len(all_channels) == 0:
-            loc_str = self.addon.getLocalizedString(30207) # 'Error during list saving. Check your logs for details.'
-            xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
-            self.set_session_status(KyivstarService.SESSION_INACTIVE)
-            return
-
-        data = '#EXTM3U\n'
-        for channel in all_channels.values():
-            if not channel.get('purchased', None):
-                continue
-
-            channel_logo = ''
-            images = channel.get('images', None)
-            if images and len(images) > 0:
-                channel_logo = images[0].get('url', None)
-
-            channel_name = channel.get('displayName', None)
-            if not channel_name:
-                channel_name = channel.get('name', None)
-
-            channel_asset_id = channel.get('assetId', None)
-
-            channel_type = 'IP'
-            ctype = channel.get('type', None)
-            if ctype:
-                channel_type = ctype.get('value', None)
-
-            channel_groups = ''
-            if include_groups:
-                channel_groups = 'group-title="%s"' % channel.get('groups', None)
-
-            channel_catchup = ''
-            if channel.get('catchupEnabled', None):
-                if channel_type == 'IP':
-                    channel_catchup = 'catchup="default" catchup-source="plugin://plugin.video.kyivstar.tv/play/%s-%s|{utc}"' % (channel_asset_id, channel_type)
-                else:
-                    channel_catchup = 'catchup="vod" catchup-source="plugin://plugin.video.kyivstar.tv/play/%s-%s|{catchup-id}"' % (channel_asset_id, channel_type)
-
-            data += '#EXTINF:0 tvg-id="%s" tvg-name="%s" tvg-logo="%s" %s %s,%s\n' % (channel_asset_id, channel_name, channel_logo, channel_groups, channel_catchup, channel_name)
-            data += 'plugin://plugin.video.kyivstar.tv/play/%s-%s|null\n' % (channel_asset_id, channel_type)
 
         # If we write data stright to the 'self.m3u_file_path' file, pvr.iptvsimple can stuck on updating channels.
         temp = xbmcvfs.translatePath('special://temp') + 'test.m3u'
 
-        f = xbmcvfs.File(temp, 'w')
-        f.write(data.encode("utf-8"))
-        f.close()
+        channel_manager.save(temp)
 
         xbmcvfs.copy(temp, self.m3u_file_path)
         xbmcvfs.delete(temp)
@@ -338,37 +263,21 @@ class KyivstarService:
         xbmc.log("KyivstarService: Saving EPG started.", xbmc.LOGDEBUG)
         xml_root = etree.Element("tv")
 
-        f = xbmcvfs.File(self.m3u_file_path)
-        m3u_list = f.read().split('\n')
-        f.close()
+        channel_manager = ChannelManager()
+        channel_manager.load(self.m3u_file_path)
 
         assets = []
 
-        for line in m3u_list:
-            if not line.startswith('#EXTINF'):
-                continue
-            match = re.search('tvg-id=".*?"', line)
-            if not match:
-                continue
-            asset_id = match.group().replace('tvg-id=', '').replace('"','')
-            xml_channel = etree.SubElement(xml_root, "channel", attrib={"id": asset_id})
-            match = re.search('tvg-name=".*?"', line)
-            if match:
-                name = match.group().replace('tvg-name=', '').replace('"','')
-                etree.SubElement(xml_channel, "display-name").text = name
-            match = re.search('tvg-logo=".*?"', line)
-            if match:
-                logo = match.group().replace('tvg-logo=', '').replace('"','')
-                etree.SubElement(xml_channel, "icon", src=logo)
+        for channel in channel_manager.enabled:
+            xml_channel = etree.SubElement(xml_root, "channel", attrib={"id": channel.id})
+            etree.SubElement(xml_channel, "display-name").text = channel.name
+            etree.SubElement(xml_channel, "icon", src=channel.logo)
 
-            catchup_avaliable = False
-            match = re.search('catchup=".*?"', line)
             #only VIRTUAL channels must have catchup-id in epg
-            if match and 'VIRTUAL' in line:
-                catchup_avaliable = True
+            catchup_avaliable = channel.catchup and channel.virtual
 
             assets.append({
-                'id': asset_id,
+                'id': channel.id,
                 'catchup':catchup_avaliable
             })
 
@@ -454,6 +363,7 @@ class KyivstarService:
 
     def run(self):
         monitor = KyivstarServiceMonitor(self)
+        self.channel_manager = ChannelManager()
 
         check_session_timer = 0
         self.check_session_status()
