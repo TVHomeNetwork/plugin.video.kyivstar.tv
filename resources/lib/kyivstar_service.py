@@ -10,7 +10,7 @@ import xbmcvfs
 import xml.etree.ElementTree as etree
 
 from resources.lib.kyivstar_request import KyivstarRequest
-from resources.lib.live_stream_server import LiveStreamServer
+from resources.lib.kyivstar_http_server import KyivstarHttpServer
 from resources.lib.channel_manager import ChannelManager
 
 class KyivstarServiceMonitor(xbmc.Monitor):
@@ -23,7 +23,6 @@ class KyivstarServiceMonitor(xbmc.Monitor):
         self.name_epg = service.addon.getSetting('name_epg')
         self.inputstream = service.addon.getSetting('stream_inputstream')
         self.locale = service.addon.getSetting('locale')
-        self.live_stream_server_enabled = service.addon.getSetting('live_stream_server_enabled')
         self.live_stream_server_port = service.addon.getSetting('live_stream_server_port')
         self.live_inputstream = service.addon.getSetting('live_stream_inputstream')
         self.m3u_include_kyivstar_groups = service.addon.getSetting('m3u_include_kyivstar_groups')
@@ -99,14 +98,6 @@ class KyivstarServiceMonitor(xbmc.Monitor):
                 m3u_start_saving = True
             if self.service.epg_file_path:
                 service.epg_start_saving = True
-
-        live_stream_server_enabled = service.addon.getSetting('live_stream_server_enabled')
-        if live_stream_server_enabled != self.live_stream_server_enabled:
-            if live_stream_server_enabled == 'true':
-                service.live_stream_server.start()
-            else:
-                service.live_stream_server.stop()
-            self.live_stream_server_enabled = live_stream_server_enabled
 
         live_stream_server_port = service.addon.getSetting('live_stream_server_port')
         if live_stream_server_port != self.live_stream_server_port:
@@ -379,9 +370,8 @@ class KyivstarService:
             if self.epg_file_path and not xbmcvfs.exists(self.epg_file_path):
                 self.epg_start_saving = True
 
-        self.live_stream_server = LiveStreamServer(self)
-        if self.addon.getSetting('live_stream_server_enabled') == 'true':
-            self.live_stream_server.start()
+        self.live_stream_server = KyivstarHttpServer(self)
+        self.live_stream_server.start()
 
         while not monitor.abortRequested():
             try:
