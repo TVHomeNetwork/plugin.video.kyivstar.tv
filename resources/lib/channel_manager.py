@@ -14,6 +14,18 @@ class Channel():
         self.url = ''
         self.groups = []
 
+    def to_dict(self):
+        return {
+            'id' : self.id,
+            'name' : self.name,
+            'logo' : self.logo,
+            'type' : self.type,
+            'catchup' : self.catchup,
+            'enabled' : self.enabled,
+            'url' : self.url,
+            'groups' : self.groups
+            }
+
     def read(self, text):
         if text.startswith('#plugin://'):
             self.enabled = False
@@ -95,6 +107,15 @@ class ChannelManager():
         self.new = []
         self.removed = []
         self.groups = []
+
+    def to_dict(self):
+        return {
+            'enabled' : [channel.to_dict() for channel in self.enabled],
+            'disabled' : [channel.to_dict() for channel in self.disabled],
+            'new' : [channel.to_dict() for channel in self.new],
+            'removed' : [channel.to_dict() for channel in self.removed],
+            'groups' : self.groups
+        }
 
     def load(self, file_path):
         with xbmcvfs.File(file_path) as f:
