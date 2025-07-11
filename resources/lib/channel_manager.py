@@ -8,7 +8,7 @@ class Channel():
         self.id = ''
         self.name = ''
         self.logo = ''
-        self.virtual = False
+        self.type = ''
         self.catchup = False
         self.enabled = True
         self.url = ''
@@ -20,7 +20,7 @@ class Channel():
             text = text[1:]
         if text.startswith('plugin://'):
             self.url = text
-            self.virtual = 'VIRTUAL' in text
+            self.type = 'VIRTUAL' if 'VIRTUAL' in text else 'IP'
             return
         match = re.search('tvg-id=".*?"', text)
         if match:
@@ -38,12 +38,12 @@ class Channel():
             self.catchup = True
 
     def write(self):
-        base_url = 'plugin://plugin.video.kyivstar.tv/play/%s-%s|' % (self.id, 'VIRTUAL' if self.virtual else 'IP')
+        base_url = 'plugin://plugin.video.kyivstar.tv/play/%s-%s|' % (self.id, self.type)
         groups = 'group-title="%s"' % ';'.join(self.groups)
         catchup = None
         if not self.catchup:
             catchup = ''
-        elif self.virtual:
+        elif self.type == 'VIRTUAL':
             catchup = 'catchup="vod" catchup-source="%s{catchup-id}"' % base_url
         else:
             catchup = 'catchup="default" catchup-source="%s{utc}"' % base_url
@@ -76,11 +76,13 @@ class Channel():
         ctype = json.get('type', None)
         ctype_value = ctype.get('value', None) if ctype else None
         if ctype_value:
-            self.virtual = ctype_value == 'VIRTUAL'
+            self.type = ctype_value
 
         self.groups = json.get('groups', '').split(';')
 
         self.catchup = json.get('catchupEnabled', None) == True
+
+        self.url = 'plugin://plugin.video.kyivstar.tv/play/%s-%s|null' % (self.id, self.type)
 
 class ChannelManager():
     def __init__(self):
