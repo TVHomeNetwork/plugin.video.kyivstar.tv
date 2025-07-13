@@ -10,6 +10,7 @@ from resources.lib.kyivstar_service import KyivstarService
 
 service = KyivstarService()
 plugin = routing.Plugin()
+handle = int(sys.argv[1])
 
 class LoginDialog(xbmcgui.WindowDialog):
     def __init__(self, phonenumber, username, password):
@@ -237,7 +238,7 @@ def play(videoid):
     if service.get_session_status() == KyivstarService.SESSION_EMPTY:
         loc_str = service.addon.getLocalizedString(30204) # 'Log in to the plugin'
         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
-        xbmcplugin.setResolvedUrl(int(sys.argv[1]), False, xbmcgui.ListItem())
+        xbmcplugin.setResolvedUrl(handle, False, xbmcgui.ListItem())
         return
 
     session_id = service.addon.getSetting('session_id')
@@ -307,7 +308,7 @@ def play(videoid):
                 live_point = time.time() - cur_program_epg['start']/1000
                 video_info = play_item.getVideoInfoTag()
                 video_info.setResumePoint(live_point, duration)
-    xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, listitem=play_item)
+    xbmcplugin.setResolvedUrl(handle, True, listitem=play_item)
 
 
 @plugin.route('')
