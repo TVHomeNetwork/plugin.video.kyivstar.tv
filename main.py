@@ -1,4 +1,5 @@
 import sys
+import requests
 import routing
 import time
 import xbmc
@@ -310,10 +311,128 @@ def play(videoid):
                 video_info.setResumePoint(live_point, duration)
     xbmcplugin.setResolvedUrl(handle, True, listitem=play_item)
 
-
 @plugin.route('')
 def root():
-    pass
+    li = xbmcgui.ListItem(label='[B]Channel manager[/B]')
+    url = plugin.url_for(view_channel_manager)
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
+
+@plugin.route('/channel_manager')
+def view_channel_manager():
+    port = service.addon.getSetting('live_stream_server_port')
+    url = 'http://127.0.0.1:%s/get_channels' % port
+    response = requests.get(url)
+    channels = response.json()
+
+    li = xbmcgui.ListItem(label='Disabled (%s)' % len(channels['disabled']))
+    url = plugin.url_for(show_dir, category='disabled')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    li = xbmcgui.ListItem(label='New (%s)' % len(channels['new']))
+    url = plugin.url_for(show_dir, category='new')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    li = xbmcgui.ListItem(label='Removed (%s)' % len(channels['removed']))
+    url = plugin.url_for(show_dir, category='removed')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    li = xbmcgui.ListItem(label='Update from Kyivstar TV')
+    url = plugin.url_for(send_command, command='download')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    if service.m3u_file_path:
+        li = xbmcgui.ListItem(label='Load from file')
+        url = plugin.url_for(send_command, command='load')
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+        li = xbmcgui.ListItem(label='Save to file')
+        url = plugin.url_for(send_command, command='save')
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    for channel in channels['enabled']:
+        li = xbmcgui.ListItem(label=channel['name'])
+        li.setArt({'icon': channel['logo'], 'fanart': service.addon.getAddonInfo('fanart')})
+        url = plugin.url_for(show_channel, asset=channel['id'])
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
+
+@plugin.route('/channel_manager/dir/<category>')
+def show_dir(category):
+    port = service.addon.getSetting('live_stream_server_port')
+    url = 'http://127.0.0.1:%s/get_channels' % port
+    response = requests.get(url)
+    channels = response.json()
+
+    for channel in channels[category]:
+        li = xbmcgui.ListItem(label=channel['name'])
+        li.setArt({'icon': channel['logo'], 'fanart': service.addon.getAddonInfo('fanart')})
+        url = plugin.url_for(show_channel, asset=channel['id'])
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
+
+@plugin.route('/channel_manager/command/<command>')
+def send_command(command):
+    port = service.addon.getSetting('live_stream_server_port')
+    url = 'http://127.0.0.1:%s/execute?command=%s' % (port, command)
+
+    requests.get(url)
+
+    xbmc.executebuiltin('Container.Refresh')
+
+@plugin.route('/channel_manager/channel/<asset>')
+def show_channel(asset):
+    port = service.addon.getSetting('live_stream_server_port')
+    url = 'http://127.0.0.1:%s/get_channel?asset=%s' % (port, asset)
+    response = requests.get(url)
+    channel = response.json()
+
+    li = xbmcgui.ListItem(label='Preview')
+    li.setProperty('IsPlayable', 'true')
+    url = plugin.url_for(play, videoid='%s-%s|null' % (channel['id'], channel['type']))
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    li = xbmcgui.ListItem(label='Enabled (%s)' % channel['enabled'])
+    url = plugin.url_for(update_channel, asset=channel['id'], _property='enabled')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    li = xbmcgui.ListItem(label='Name (%s)' % channel['name'])
+    url = plugin.url_for(update_channel, asset=channel['id'], _property='name')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    li = xbmcgui.ListItem(label='Logo (%s)' % channel['logo'])
+    url = plugin.url_for(update_channel, asset=channel['id'], _property='logo')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
+
+@plugin.route('/channel_manager/channel/<asset>/<_property>')
+def update_channel(asset, _property):
+    port = service.addon.getSetting('live_stream_server_port')
+    url = 'http://127.0.0.1:%s/get_channel?asset=%s' % (port, asset)
+    response = requests.get(url)
+    channel = response.json()
+
+    url = 'http://127.0.0.1:%s/update_channel?asset=%s&property=%s&value=' % (port, asset, _property)
+
+    if _property == 'enabled':
+        url += 'unused'
+    elif _property == 'name':
+        value = xbmcgui.Dialog().input('Change channel name', defaultt=channel['name'])
+        if value == '' or value == channel['name']:
+            return
+        url += value
+    elif _property == 'logo':
+        value = xbmcgui.Dialog().browseSingle(2, 'Change channel logo', '', '.jpg|.png', False, False, channel['logo'])
+        if value == '' or value == channel['logo']:
+            return
+        url += value
+    requests.get(url)
+
+    xbmc.executebuiltin('Container.Refresh')
 
 if __name__ == '__main__':
     plugin.run()

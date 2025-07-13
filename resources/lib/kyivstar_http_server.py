@@ -1,3 +1,4 @@
+import json
 import threading
 
 import xbmc
@@ -29,8 +30,66 @@ class HttpGetHandler(BaseHTTPRequestHandler):
         stream_url = url_query[strip_length:]
         return 'application/vnd.apple.mpegurl', self.server.manager.get_chunklist_content(stream_url, live)
 
+    def handle_get_channels(self):
+        service = self.server.service
+        channel_manager = service.channel_manager
+
+        return 'application/json', json.dumps(channel_manager.to_dict()).encode('utf-8')
+
+    def handle_get_channel(self, url_query):
+        query = parse_qs(url_query)
+        asset_id = query['asset'][0]
+
+        channel_manager = self.server.service.channel_manager
+
+        return 'application/json', json.dumps(channel_manager.all[asset_id].to_dict()).encode('utf-8')
+
+    def handle_update_channel(self, url_query):
+        query = parse_qs(url_query)
+        asset_id = query['asset'][0]
+        _property = query['property'][0]
+        value = query['value'][0]
+
+        channel_manager = self.server.service.channel_manager
+        channel = channel_manager.all[asset_id]
+
+        if _property == 'enabled':
+            channel.enabled = not channel.enabled
+            if channel in channel_manager.removed:
+                pass
+            elif channel in channel_manager.new:
+                channel_manager.new.remove(channel)
+                channel_manager.disabled.append(channel)
+            elif channel.enabled:
+                channel_manager.enabled.append(channel)
+                channel_manager.disabled.remove(channel)
+            else:
+                channel_manager.enabled.remove(channel)
+                channel_manager.disabled.append(channel)
+        elif _property == 'name':
+            channel.name = value
+        elif _property == 'logo':
+            channel.logo = value
+        return None, ''
+
+    def handle_execute(self, url_query):
+        query = parse_qs(url_query)
+        command = query['command'][0]
+
+        service = self.server.service
+        channel_manager = service.channel_manager
+
+        if command == 'load':
+            channel_manager.reset()
+            channel_manager.load(service.m3u_file_path)
+        elif command == 'save':
+            channel_manager.save(service.m3u_file_path)
+        elif command == 'download':
+            channel_manager.download(service)
+        return None, ''
+
     def do_GET(self):
-        xbmc.log("KyivstarLiveStreamServer: GET %s" % self.path, xbmc.LOGDEBUG)
+        xbmc.log("KyivstarHttpServer: GET %s" % self.path, xbmc.LOGDEBUG)
 
         content = None
         content_type = ''
@@ -39,6 +98,14 @@ class HttpGetHandler(BaseHTTPRequestHandler):
             content_type, content = self.handle_get_playlist(url.query)
         elif url.path == '/chunklist.m3u8':
             content_type, content = self.handle_get_chunklist(url.query)
+        elif url.path == '/get_channels':
+            content_type, content = self.handle_get_channels()
+        elif url.path == '/get_channel':
+            content_type, content = self.handle_get_channel(url.query)
+        elif url.path == '/update_channel':
+            content_type, content = self.handle_update_channel(url.query)
+        elif url.path == '/execute':
+            content_type, content = self.handle_execute(url.query)
 
         if content:
             if len(content) > 0:
