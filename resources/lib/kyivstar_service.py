@@ -265,7 +265,7 @@ class KyivstarService:
             etree.SubElement(xml_channel, "icon", src=channel.logo)
 
             #only VIRTUAL channels must have catchup-id in epg
-            catchup_avaliable = channel.catchup and channel.virtual
+            catchup_avaliable = channel.catchup and channel.type == 'VIRTUAL'
 
             assets.append({
                 'id': channel.id,
