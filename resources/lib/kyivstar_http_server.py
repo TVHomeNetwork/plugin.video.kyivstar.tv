@@ -49,8 +49,10 @@ class HttpGetHandler(BaseHTTPRequestHandler):
                 self.wfile.write(content)
             else:
                 self.send_response(204)
+                self.end_headers()
         else:
             self.send_response(404)
+            self.end_headers()
 
     def log_message(self, format, *args):
         pass
