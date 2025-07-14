@@ -313,7 +313,8 @@ def play(videoid):
 
 @plugin.route('')
 def root():
-    li = xbmcgui.ListItem(label='[B]Channel manager[/B]')
+    loc_str = service.addon.getLocalizedString(30500) # 'Channel manager'
+    li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
     url = plugin.url_for(view_channel_manager)
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
@@ -326,28 +327,34 @@ def view_channel_manager():
     response = requests.get(url)
     channels = response.json()
 
-    li = xbmcgui.ListItem(label='Disabled (%s)' % len(channels['disabled']))
+    loc_str = service.addon.getLocalizedString(30501) # 'Disabled'
+    li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, len(channels['disabled'])))
     url = plugin.url_for(show_dir, category='disabled')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
-    li = xbmcgui.ListItem(label='New (%s)' % len(channels['new']))
+    loc_str = service.addon.getLocalizedString(30502) # 'New'
+    li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, len(channels['new'])))
     url = plugin.url_for(show_dir, category='new')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
-    li = xbmcgui.ListItem(label='Removed (%s)' % len(channels['removed']))
+    loc_str = service.addon.getLocalizedString(30503) # 'Removed'
+    li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, len(channels['removed'])))
     url = plugin.url_for(show_dir, category='removed')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
-    li = xbmcgui.ListItem(label='Update from Kyivstar TV')
+    loc_str = service.addon.getLocalizedString(30504) # 'Update from Kyivstar TV'
+    li = xbmcgui.ListItem(label=loc_str)
     url = plugin.url_for(send_command, command='download')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
     if service.m3u_file_path:
-        li = xbmcgui.ListItem(label='Load from file')
+        loc_str = service.addon.getLocalizedString(30505) # 'Load from file'
+        li = xbmcgui.ListItem(label=loc_str)
         url = plugin.url_for(send_command, command='load')
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
-        li = xbmcgui.ListItem(label='Save to file')
+        loc_str = service.addon.getLocalizedString(30506) # 'Save to file'
+        li = xbmcgui.ListItem(label=loc_str)
         url = plugin.url_for(send_command, command='save')
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
@@ -390,20 +397,26 @@ def show_channel(asset):
     response = requests.get(url)
     channel = response.json()
 
-    li = xbmcgui.ListItem(label='Preview')
+    loc_str = service.addon.getLocalizedString(30507) # 'Preview'
+    li = xbmcgui.ListItem(label=loc_str)
     li.setProperty('IsPlayable', 'true')
     url = plugin.url_for(play, videoid='%s-%s|null' % (channel['id'], channel['type']))
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
-    li = xbmcgui.ListItem(label='Enabled (%s)' % channel['enabled'])
+    loc_str = service.addon.getLocalizedString(30508) # 'Enabled'
+    if not channel['enabled']:
+        loc_str = service.addon.getLocalizedString(30509) # 'Disabled'
+    li = xbmcgui.ListItem(label=loc_str)
     url = plugin.url_for(update_channel, asset=channel['id'], _property='enabled')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
-    li = xbmcgui.ListItem(label='Name (%s)' % channel['name'])
+    loc_str = service.addon.getLocalizedString(30510) # 'Name'
+    li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, channel['name']))
     url = plugin.url_for(update_channel, asset=channel['id'], _property='name')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
-    li = xbmcgui.ListItem(label='Logo (%s)' % channel['logo'])
+    loc_str = service.addon.getLocalizedString(30511) # 'Logo'
+    li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, channel['logo']))
     url = plugin.url_for(update_channel, asset=channel['id'], _property='logo')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
@@ -421,12 +434,14 @@ def update_channel(asset, _property):
     if _property == 'enabled':
         url += 'unused'
     elif _property == 'name':
-        value = xbmcgui.Dialog().input('Change channel name', defaultt=channel['name'])
+        loc_str = service.addon.getLocalizedString(30512) # 'Change channel name'
+        value = xbmcgui.Dialog().input(loc_str, defaultt=channel['name'])
         if value == '' or value == channel['name']:
             return
         url += value
     elif _property == 'logo':
-        value = xbmcgui.Dialog().browseSingle(2, 'Change channel logo', '', '.jpg|.png', False, False, channel['logo'])
+        loc_str = service.addon.getLocalizedString(30513) # 'Change channel logo'
+        value = xbmcgui.Dialog().browseSingle(2, loc_str, '', '.jpg|.png', False, False, channel['logo'])
         if value == '' or value == channel['logo']:
             return
         url += value

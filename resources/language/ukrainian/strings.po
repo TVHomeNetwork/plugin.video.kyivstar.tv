@@ -286,3 +286,61 @@ msgstr "Помилка під час перевірки стану сеансу.
 msgctxt "#30213"
 msgid "Inputstream addon does not found. Set value to default."
 msgstr "Доповнення Inputstream не знайдено. Встановлено значення за замовчуванням."
+
+# Plugin menu
+
+msgctxt "#30500"
+msgid "Channel manager"
+msgstr "Менеджер каналів"
+
+msgctxt "#30501"
+msgid "Disabled"
+msgstr "Вимкнені"
+
+msgctxt "#30502"
+msgid "New"
+msgstr "Нові"
+
+msgctxt "#30503"
+msgid "Removed"
+msgstr "Видалені"
+
+msgctxt "#30504"
+msgid "Update from Kyivstar TV"
+msgstr "Оновлення від Київстар ТБ"
+
+msgctxt "#30505"
+msgid "Load from file"
+msgstr "Завантажити з файлу"
+
+msgctxt "#30506"
+msgid "Save to file"
+msgstr "Зберегти у файл"
+
+msgctxt "#30507"
+msgid "Preview"
+msgstr "Попередній перегляд"
+
+msgctxt "#30508"
+msgid "Enabled"
+msgstr "Увімкнений"
+
+msgctxt "#30509"
+msgid "Disabled"
+msgstr "Вимкнений"
+
+msgctxt "#30510"
+msgid "Name"
+msgstr "Назва"
+
+msgctxt "#30511"
+msgid "Logo"
+msgstr "Логотип"
+
+msgctxt "#30512"
+msgid "Change channel name"
+msgstr "Змінити назву каналу"
+
+msgctxt "#30513"
+msgid "Change channel logo"
+msgstr "Змінити логотип каналу"

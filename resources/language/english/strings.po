@@ -286,3 +286,61 @@ msgstr ""
 msgctxt "#30213"
 msgid "Inputstream addon does not found. Set value to default."
 msgstr ""
+
+# Plugin menu
+
+msgctxt "#30500"
+msgid "Channel manager"
+msgstr ""
+
+msgctxt "#30501"
+msgid "Disabled"
+msgstr ""
+
+msgctxt "#30502"
+msgid "New"
+msgstr ""
+
+msgctxt "#30503"
+msgid "Removed"
+msgstr ""
+
+msgctxt "#30504"
+msgid "Update from Kyivstar TV"
+msgstr ""
+
+msgctxt "#30505"
+msgid "Load from file"
+msgstr ""
+
+msgctxt "#30506"
+msgid "Save to file"
+msgstr ""
+
+msgctxt "#30507"
+msgid "Preview"
+msgstr ""
+
+msgctxt "#30508"
+msgid "Enabled"
+msgstr ""
+
+msgctxt "#30509"
+msgid "Disabled"
+msgstr ""
+
+msgctxt "#30510"
+msgid "Name"
+msgstr ""
+
+msgctxt "#30511"
+msgid "Logo"
+msgstr ""
+
+msgctxt "#30512"
+msgid "Change channel name"
+msgstr ""
+
+msgctxt "#30513"
+msgid "Change channel logo"
+msgstr ""
