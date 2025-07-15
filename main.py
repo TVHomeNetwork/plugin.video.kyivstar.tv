@@ -315,13 +315,15 @@ def play(videoid):
 def root():
     loc_str = service.addon.getLocalizedString(30500) # 'Channel manager'
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
-    url = plugin.url_for(view_channel_manager)
+    icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+    url = plugin.url_for(show_channel_manager)
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
     xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
 
 @plugin.route('/channel_manager')
-def view_channel_manager():
+def show_channel_manager():
     port = service.addon.getSetting('live_stream_server_port')
     url = 'http://127.0.0.1:%s/get_channels' % port
     response = requests.get(url)
@@ -329,32 +331,44 @@ def view_channel_manager():
 
     loc_str = service.addon.getLocalizedString(30501) # 'Disabled'
     li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, len(channels['disabled'])))
+    icon = service.addon.getAddonInfo('path') + '/resources/images/disabled-list.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(show_dir, category='disabled')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
     loc_str = service.addon.getLocalizedString(30502) # 'New'
     li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, len(channels['new'])))
+    icon = service.addon.getAddonInfo('path') + '/resources/images/new-list.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(show_dir, category='new')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
     loc_str = service.addon.getLocalizedString(30503) # 'Removed'
     li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, len(channels['removed'])))
+    icon = service.addon.getAddonInfo('path') + '/resources/images/removed-list.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(show_dir, category='removed')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
     loc_str = service.addon.getLocalizedString(30504) # 'Update from Kyivstar TV'
     li = xbmcgui.ListItem(label=loc_str)
+    icon = service.addon.getAddonInfo('path') + '/resources/images/update-from-remote.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(send_command, command='download')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
     if service.m3u_file_path:
         loc_str = service.addon.getLocalizedString(30505) # 'Load from file'
         li = xbmcgui.ListItem(label=loc_str)
+        icon = service.addon.getAddonInfo('path') + '/resources/images/load-from-file.png'
+        li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
         url = plugin.url_for(send_command, command='load')
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
         loc_str = service.addon.getLocalizedString(30506) # 'Save to file'
         li = xbmcgui.ListItem(label=loc_str)
+        icon = service.addon.getAddonInfo('path') + '/resources/images/save-to-file.png'
+        li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
         url = plugin.url_for(send_command, command='save')
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
@@ -417,6 +431,7 @@ def show_channel(asset):
 
     loc_str = service.addon.getLocalizedString(30511) # 'Logo'
     li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, channel['logo']))
+    li.setArt({'icon': channel['logo'], 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(update_channel, asset=channel['id'], _property='logo')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
