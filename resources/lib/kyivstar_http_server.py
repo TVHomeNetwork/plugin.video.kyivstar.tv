@@ -3,7 +3,7 @@ import threading
 
 import xbmc
 
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from resources.lib.kyivstar_stream_manager import KyivstarStreamManager
 
@@ -48,7 +48,7 @@ class HttpGetHandler(BaseHTTPRequestHandler):
         query = parse_qs(url_query)
         asset_id = query['asset'][0]
         _property = query['property'][0]
-        value = query['value'][0]
+        value = unquote(query['value'][0])
 
         channel_manager = self.server.service.channel_manager
         channel = channel_manager.all[asset_id]

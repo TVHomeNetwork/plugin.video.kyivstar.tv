@@ -7,6 +7,7 @@ import xbmcgui
 import xbmcplugin
 import xbmcvfs
 
+from urllib.parse import quote
 from resources.lib.kyivstar_service import KyivstarService
 
 service = KyivstarService()
@@ -453,13 +454,13 @@ def update_channel(asset, _property):
         value = xbmcgui.Dialog().input(loc_str, defaultt=channel['name'])
         if value == '' or value == channel['name']:
             return
-        url += value
+        url += quote(value)
     elif _property == 'logo':
         loc_str = service.addon.getLocalizedString(30513) # 'Change channel logo'
         value = xbmcgui.Dialog().browseSingle(2, loc_str, '', '.jpg|.png', False, False, channel['logo'])
         if value == '' or value == channel['logo']:
             return
-        url += value
+        url += quote(value)
     requests.get(url)
 
     xbmc.executebuiltin('Container.Refresh')
