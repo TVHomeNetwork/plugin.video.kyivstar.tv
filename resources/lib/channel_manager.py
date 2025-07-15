@@ -193,10 +193,12 @@ class ChannelManager():
         if len(all_channels) == 0:
             return False
 
+        update_existing_channels = service.addon.getSetting('update_existing_channels') == 'true'
         for channel in all_channels.values():
             asset_id = channel.get('assetId', None)
             if asset_id in self.all:
-                self.all[asset_id].update(channel)
+                if update_existing_channels:
+                    self.all[asset_id].update(channel)
             else:
                 self.all[asset_id] = Channel()
                 self.new.append(self.all[asset_id])

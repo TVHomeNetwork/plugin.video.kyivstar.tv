@@ -133,6 +133,13 @@
                     <control type="toggle" />
                 </setting>
             </group>
+            <group id="group_10" label="30038">
+                <setting id="update_existing_channels" type="boolean" label="30039" help="-1">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+            </group>
         </category>
         <category id="epg" label="30013">
             <group id="group_4" label="30014">
