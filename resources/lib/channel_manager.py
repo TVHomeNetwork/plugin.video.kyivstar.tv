@@ -70,15 +70,20 @@ class Channel():
         return text
 
     def update(self, json):
+        changed = False
         images = json.get('images', None)
         logo = images[0].get('url', None) if images and len(images) > 0 else None
         if logo:
+            if self.logo != logo:
+                changed = True
             self.logo = logo
 
         name = json.get('displayName', None)
         if name is None:
             name = json.get('name', None)
         if name:
+            if self.name != name:
+                changed = True
             self.name = name
 
         asset_id = json.get('assetId', None)
@@ -88,13 +93,22 @@ class Channel():
         ctype = json.get('type', None)
         ctype_value = ctype.get('value', None) if ctype else None
         if ctype_value:
+            if self.type != ctype_value:
+                changed = True
             self.type = ctype_value
 
-        self.groups = json.get('groups', '').split(';')
+        groups = json.get('groups', '').split(';')
+        if self.groups != groups:
+            changed = True
+        self.groups = groups
 
-        self.catchup = json.get('catchupEnabled', None) == True
+        catchup = json.get('catchupEnabled', None) == True
+        if self.catchup != catchup:
+            changed = True
+        self.catchup = catchup
 
         self.url = 'plugin://plugin.video.kyivstar.tv/play/%s-%s|null' % (self.id, self.type)
+        return changed
 
 class ChannelManager():
     def __init__(self):
@@ -107,6 +121,7 @@ class ChannelManager():
         self.new = []
         self.removed = []
         self.groups = []
+        self.changed = False
 
     def to_dict(self):
         return {
@@ -114,7 +129,8 @@ class ChannelManager():
             'disabled' : [channel.to_dict() for channel in self.disabled],
             'new' : [channel.to_dict() for channel in self.new],
             'removed' : [channel.to_dict() for channel in self.removed],
-            'groups' : self.groups
+            'groups' : self.groups,
+            'changed' : self.changed
         }
 
     def load(self, file_path):
@@ -149,6 +165,7 @@ class ChannelManager():
 
         with xbmcvfs.File(file_path, 'w') as f:
             f.write(data.encode("utf-8"))
+        self.changed = False
 
     def download(self, service):
         session_id = service.addon.getSetting('session_id')
@@ -198,11 +215,13 @@ class ChannelManager():
             asset_id = channel.get('assetId', None)
             if asset_id in self.all:
                 if update_existing_channels:
-                    self.all[asset_id].update(channel)
+                    if self.all[asset_id].update(channel):
+                        self.changed = True
             else:
                 self.all[asset_id] = Channel()
                 self.new.append(self.all[asset_id])
                 self.all[asset_id].update(channel)
+                self.changed = True
 
         for channel in self.all.values():
             if channel.id in all_channels:
@@ -212,4 +231,5 @@ class ChannelManager():
                 self.enabled.remove(channel)
             else:
                 self.disabled.remove(channel)
+            self.changed = True
         return True

@@ -363,11 +363,17 @@ def show_channel_manager():
         li = xbmcgui.ListItem(label=loc_str)
         icon = service.addon.getAddonInfo('path') + '/resources/images/load-from-file.png'
         li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
-        url = plugin.url_for(send_command, command='load')
+        command = 'load'
+        if channels['changed']:
+            command = 'load_changed'
+        url = plugin.url_for(send_command, command=command)
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
+        format_str = '{}'
+        if channels['changed']:
+            format_str = '[COLOR=gold]*{}[/COLOR]'
         loc_str = service.addon.getLocalizedString(30506) # 'Save to file'
-        li = xbmcgui.ListItem(label=loc_str)
+        li = xbmcgui.ListItem(label=format_str.format(loc_str))
         icon = service.addon.getAddonInfo('path') + '/resources/images/save-to-file.png'
         li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
         url = plugin.url_for(send_command, command='save')
@@ -398,6 +404,16 @@ def show_dir(category):
 
 @plugin.route('/channel_manager/command/<command>')
 def send_command(command):
+    if command == 'load_changed':
+        loc_str_1 = service.addon.getLocalizedString(30116) # 'Loading from file'
+        loc_str_2 = service.addon.getLocalizedString(30117) # 'You have unsaved changes. If you proceed, you will lose it. Continue?'
+        loc_str_3 = service.addon.getLocalizedString(30112) # 'Yes'
+        loc_str_4 = service.addon.getLocalizedString(30113) # 'No'
+        result = xbmcgui.Dialog().yesno(loc_str_1, loc_str_2, yeslabel=loc_str_3, nolabel=loc_str_4)
+        if not result:
+            return
+        command = 'load'
+
     port = service.addon.getSetting('live_stream_server_port')
     url = 'http://127.0.0.1:%s/execute?command=%s' % (port, command)
 

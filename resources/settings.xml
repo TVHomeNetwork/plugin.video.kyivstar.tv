@@ -139,6 +139,11 @@
                     <default>false</default>
                     <control type="toggle" />
                 </setting>
+                <setting id="autosave_changes_on_exit" type="boolean" label="30040" help="-1">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
             </group>
         </category>
         <category id="epg" label="30013">

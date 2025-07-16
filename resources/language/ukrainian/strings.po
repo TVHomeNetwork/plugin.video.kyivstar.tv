@@ -88,6 +88,10 @@ msgctxt "#30039"
 msgid "When updating, give preference to changes from Kyivstar TV rather than local"
 msgstr "Під час оновлення надавати перевагу змінам від Київстар ТБ, а не локальним"
 
+msgctxt "#30040"
+msgid "Autosave changes on exit"
+msgstr "Автоматичне збереження змін при виході"
+
 # EPG category
 msgctxt "#30013"
 msgid "EPG"
@@ -237,6 +241,14 @@ msgstr "Увага"
 msgctxt "#30115"
 msgid "This will cancel the EPG save process that is not yet complete. Continue?"
 msgstr "Це скасує процес збереження EPG, який ще не завершено. Продовжити?"
+
+msgctxt "#30116"
+msgid "Loading from file"
+msgstr "Завантаження з файлу"
+
+msgctxt "#30117"
+msgid "You have unsaved changes. If you proceed, you will lose it. Continue?"
+msgstr "У вас є незбережені зміни. Якщо ви продовжите, ви їх втратите. Продовжити?"
 
 # Notifications
 msgctxt "#30200"

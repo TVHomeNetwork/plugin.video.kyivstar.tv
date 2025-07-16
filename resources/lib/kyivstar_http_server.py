@@ -70,6 +70,7 @@ class HttpGetHandler(BaseHTTPRequestHandler):
             channel.name = value
         elif _property == 'logo':
             channel.logo = value
+        channel_manager.changed = True
         return None, ''
 
     def handle_execute(self, url_query):

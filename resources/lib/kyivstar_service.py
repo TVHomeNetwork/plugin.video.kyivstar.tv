@@ -422,3 +422,5 @@ class KyivstarService:
                 xbmc.log("KyivstarService exception (line %s): %s" % (exc_tb.tb_lineno,str(e)), xbmc.LOGERROR)
 
         self.live_stream_server.stop()
+        if self.m3u_file_path and self.channel_manager.changed and self.addon.getSetting('autosave_changes_on_exit') == 'true':
+            self.channel_manager.save(self.m3u_file_path)
