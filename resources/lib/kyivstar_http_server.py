@@ -48,7 +48,9 @@ class HttpGetHandler(BaseHTTPRequestHandler):
         query = parse_qs(url_query)
         asset_id = query['asset'][0]
         _property = query['property'][0]
-        value = unquote(query['value'][0])
+        value = ''
+        if 'value' in query:
+            value = unquote(query['value'][0])
 
         channel_manager = self.server.service.channel_manager
         channel = channel_manager.all[asset_id]
@@ -70,6 +72,8 @@ class HttpGetHandler(BaseHTTPRequestHandler):
             channel.name = value
         elif _property == 'logo':
             channel.logo = value
+        elif _property == 'chno':
+            channel.chno = value
         channel_manager.changed = True
         return None, ''
 

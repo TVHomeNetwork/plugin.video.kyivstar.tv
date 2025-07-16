@@ -453,6 +453,11 @@ def show_channel(asset):
     url = plugin.url_for(update_channel, asset=channel['id'], _property='logo')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
+    loc_str = service.addon.getLocalizedString(30515) # 'Number'
+    li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, channel['chno']))
+    url = plugin.url_for(update_channel, asset=channel['id'], _property='chno')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
     movable = len(sys.argv) >= 3 and sys.argv[2] == '?movable'
     if movable:
         loc_str = service.addon.getLocalizedString(30514) # 'Move'
@@ -503,6 +508,13 @@ def update_channel(asset, _property):
         if value == '' or value == channel['logo']:
             return
         url += quote(value)
+    elif _property == 'chno':
+        loc_str = service.addon.getLocalizedString(30516) # 'Change channel number'
+        value = xbmcgui.Dialog().input(loc_str, defaultt=channel['chno'], type=1)
+        if value == channel['chno']:
+            return
+        url += quote(value)
+
     requests.get(url)
 
     xbmc.executebuiltin('Container.Refresh')

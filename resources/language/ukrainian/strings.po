@@ -357,6 +357,10 @@ msgctxt "#30511"
 msgid "Logo"
 msgstr "Логотип"
 
+msgctxt "#30515"
+msgid "Number"
+msgstr "Номер"
+
 msgctxt "#30514"
 msgid "Move"
 msgstr "Перемістити"
@@ -368,3 +372,7 @@ msgstr "Змінити назву каналу"
 msgctxt "#30513"
 msgid "Change channel logo"
 msgstr "Змінити логотип каналу"
+
+msgctxt "#30516"
+msgid "Change channel number"
+msgstr "Змінити номер каналу"

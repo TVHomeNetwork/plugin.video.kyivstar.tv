@@ -8,6 +8,7 @@ class Channel():
         self.id = ''
         self.name = ''
         self.logo = ''
+        self.chno = ''
         self.type = ''
         self.catchup = False
         self.enabled = True
@@ -19,6 +20,7 @@ class Channel():
             'id' : self.id,
             'name' : self.name,
             'logo' : self.logo,
+            'chno' : self.chno,
             'type' : self.type,
             'catchup' : self.catchup,
             'enabled' : self.enabled,
@@ -43,6 +45,9 @@ class Channel():
         match = re.search('tvg-logo=".*?"', text)
         if match:
             self.logo = match.group().split('"')[1]
+        match = re.search('tvg-chno=".*?"', text)
+        if match:
+            self.chno = match.group().split('"')[1]
         match = re.search('group-title=".*?"', text)
         if match:
             self.groups = match.group().split('"')[1].split(';')
@@ -52,6 +57,9 @@ class Channel():
     def write(self):
         base_url = 'plugin://plugin.video.kyivstar.tv/play/%s-%s|' % (self.id, self.type)
         groups = 'group-title="%s"' % ';'.join(self.groups)
+        chno = ''
+        if self.chno != '':
+            chno = 'tvg-chno="%s"' % self.chno
         catchup = None
         if not self.catchup:
             catchup = ''
@@ -59,7 +67,7 @@ class Channel():
             catchup = 'catchup="vod" catchup-source="%s{catchup-id}"' % base_url
         else:
             catchup = 'catchup="default" catchup-source="%s{utc}"' % base_url
-        text = '#EXTINF:0 tvg-id="%s" tvg-name="%s" tvg-logo="%s" %s %s,%s\n' % (self.id, self.name, self.logo, groups, catchup, self.name)
+        text = '#EXTINF:0 tvg-id="%s" tvg-name="%s" tvg-logo="%s" %s %s %s,%s\n' % (self.id, self.name, self.logo, chno, groups, catchup, self.name)
 
         if self.url == '':
             self.url = base_url + 'null'
