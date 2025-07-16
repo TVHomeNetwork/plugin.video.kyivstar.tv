@@ -73,6 +73,19 @@ class HttpGetHandler(BaseHTTPRequestHandler):
         channel_manager.changed = True
         return None, ''
 
+    def handle_move_channel(self, url_query):
+        query = parse_qs(url_query)
+        asset_id = query['asset'][0]
+        position = int(query['position'][0])
+
+        channel_manager = self.server.service.channel_manager
+        channel = channel_manager.all[asset_id]
+
+        channel_manager.enabled.remove(channel)
+        channel_manager.enabled.insert(position, channel)
+        channel_manager.changed = True
+        return None, ''
+
     def handle_execute(self, url_query):
         query = parse_qs(url_query)
         command = query['command'][0]
@@ -105,6 +118,8 @@ class HttpGetHandler(BaseHTTPRequestHandler):
             content_type, content = self.handle_get_channel(url.query)
         elif url.path == '/update_channel':
             content_type, content = self.handle_update_channel(url.query)
+        elif url.path == '/move_channel':
+            content_type, content = self.handle_move_channel(url.query)
         elif url.path == '/execute':
             content_type, content = self.handle_execute(url.query)
 

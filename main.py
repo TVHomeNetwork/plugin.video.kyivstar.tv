@@ -383,6 +383,7 @@ def show_channel_manager():
         li = xbmcgui.ListItem(label=channel['name'])
         li.setArt({'icon': channel['logo'], 'fanart': service.addon.getAddonInfo('fanart')})
         url = plugin.url_for(show_channel, asset=channel['id'])
+        url += '?movable'
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
     xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
@@ -452,11 +453,36 @@ def show_channel(asset):
     url = plugin.url_for(update_channel, asset=channel['id'], _property='logo')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
+    movable = len(sys.argv) >= 3 and sys.argv[2] == '?movable'
+    if movable:
+        loc_str = service.addon.getLocalizedString(30514) # 'Move'
+        li = xbmcgui.ListItem(label=loc_str)
+        url = plugin.url_for(update_channel, asset=channel['id'], _property='move')
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
     xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
 
 @plugin.route('/channel_manager/channel/<asset>/<_property>')
 def update_channel(asset, _property):
     port = service.addon.getSetting('live_stream_server_port')
+    if _property == 'move':
+        url = 'http://127.0.0.1:%s/get_channels' % port
+        response = requests.get(url)
+        channels = response.json()
+
+        position = 0
+        for channel in channels['enabled']:
+            if channel['id'] == asset:
+                continue
+            li = xbmcgui.ListItem(label=channel['name'])
+            li.setArt({'icon': channel['logo'], 'fanart': service.addon.getAddonInfo('fanart')})
+            url = plugin.url_for(move_channel, asset=asset, position=position)
+            xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+            position += 1
+
+        xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
+        return
+
     url = 'http://127.0.0.1:%s/get_channel?asset=%s' % (port, asset)
     response = requests.get(url)
     channel = response.json()
@@ -480,6 +506,16 @@ def update_channel(asset, _property):
     requests.get(url)
 
     xbmc.executebuiltin('Container.Refresh')
+
+@plugin.route('/channel_manager/move/<asset>/<position>')
+def move_channel(asset, position):
+    port = service.addon.getSetting('live_stream_server_port')
+    url = 'http://127.0.0.1:%s/move_channel?asset=%s&position=%s' % (port, asset, position)
+
+    requests.get(url)
+
+    path = 'plugin://%s/channel_manager' % service.addon.getAddonInfo('id')
+    xbmc.executebuiltin('Container.Update("%s", "replace")' % path)
 
 if __name__ == '__main__':
     plugin.run()

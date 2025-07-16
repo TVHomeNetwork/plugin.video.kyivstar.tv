@@ -357,6 +357,10 @@ msgctxt "#30511"
 msgid "Logo"
 msgstr ""
 
+msgctxt "#30514"
+msgid "Move"
+msgstr ""
+
 msgctxt "#30512"
 msgid "Change channel name"
 msgstr ""
