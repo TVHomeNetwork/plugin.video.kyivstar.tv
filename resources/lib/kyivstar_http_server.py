@@ -102,6 +102,11 @@ class HttpGetHandler(BaseHTTPRequestHandler):
             channel_manager.load(service.m3u_file_path)
         elif command == 'save':
             channel_manager.save(service.m3u_file_path)
+
+            if service.addon.getSetting('iptv_sc_reload_when_m3u_saved') == 'true':
+                xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":false}}')
+                xbmc.sleep(1000)
+                xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":true}}')
         elif command == 'download':
             channel_manager.download(service)
         return None, ''
