@@ -41,8 +41,10 @@ class HttpGetHandler(BaseHTTPRequestHandler):
         asset_id = query['asset'][0]
 
         channel_manager = self.server.service.channel_manager
+        channel_dict = channel_manager.all[asset_id].to_dict()
+        channel_dict['all_groups'] = channel_manager.groups
 
-        return 'application/json', json.dumps(channel_manager.all[asset_id].to_dict()).encode('utf-8')
+        return 'application/json', json.dumps(channel_dict).encode('utf-8')
 
     def handle_update_channel(self, url_query):
         query = parse_qs(url_query)
@@ -74,6 +76,25 @@ class HttpGetHandler(BaseHTTPRequestHandler):
             channel.logo = value
         elif _property == 'chno':
             channel.chno = value
+        elif _property == 'groups':
+            channel.groups = value.split(';')
+        elif _property == 'rename_group':
+            old_value, new_value = value.split(';')
+            index = channel_manager.groups.index(old_value)
+            channel_manager.groups[index] = new_value
+            for channel in channel_manager.all.values():
+                try:
+                    index = channel.groups.index(old_value)
+                    channel.groups[index] = new_value
+                except ValueError:
+                    pass
+        elif _property == 'create_group':
+            channel_manager.groups.append(value)
+        elif _property == 'remove_groups':
+            removed_groups = value.split(';')
+            channel_manager.groups = [group for group in channel_manager.groups if group not in removed_groups]
+            for channel in channel_manager.all.values():
+                channel.groups = [group for group in channel.groups if group not in removed_groups]
         channel_manager.changed = True
         return None, ''
 

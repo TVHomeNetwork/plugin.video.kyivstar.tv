@@ -465,6 +465,27 @@ def show_channel(asset):
         url = plugin.url_for(update_channel, asset=channel['id'], _property='move')
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
+    groups = ';'.join(channel['groups'])
+    loc_str = service.addon.getLocalizedString(30517) # 'Include/exclude groups'
+    li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, groups))
+    url = plugin.url_for(update_channel, asset=channel['id'], _property='groups')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    loc_str = service.addon.getLocalizedString(30518) # 'Rename group'
+    li = xbmcgui.ListItem(label=loc_str)
+    url = plugin.url_for(update_channel, asset=channel['id'], _property='rename_group')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    loc_str = service.addon.getLocalizedString(30519) # 'Create new group'
+    li = xbmcgui.ListItem(label=loc_str)
+    url = plugin.url_for(update_channel, asset=channel['id'], _property='create_group')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    loc_str = service.addon.getLocalizedString(30520) # 'Remove chosen groups'
+    li = xbmcgui.ListItem(label=loc_str)
+    url = plugin.url_for(update_channel, asset=channel['id'], _property='remove_groups')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
     xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
 
 @plugin.route('/channel_manager/channel/<asset>/<_property>')
@@ -514,6 +535,52 @@ def update_channel(asset, _property):
         if value == channel['chno']:
             return
         url += quote(value)
+    elif _property == 'groups':
+        all_groups = channel['all_groups']
+        groups = channel['groups']
+        preselect = [index for index, value in enumerate(all_groups) if value in groups]
+        loc_str = service.addon.getLocalizedString(30517) # 'Include/exclude groups'
+        indexes = xbmcgui.Dialog().multiselect(loc_str, all_groups, 0, preselect)
+        if indexes is None:
+            return
+        values = [value for index, value in enumerate(all_groups) if index in indexes]
+        if groups == values:
+            return
+        url += quote(';'.join(values))
+    elif _property == 'rename_group':
+        all_groups = channel['all_groups']
+        loc_str = service.addon.getLocalizedString(30518) # 'Rename group'
+        index = xbmcgui.Dialog().select(loc_str, all_groups)
+        if index < 0:
+            return
+        old_value = all_groups[index]
+        new_value = xbmcgui.Dialog().input(loc_str, defaultt=old_value)
+        if new_value == '' or new_value == old_value:
+            return
+        url += quote('%s;%s' % (old_value, new_value))
+    elif _property == 'create_group':
+        loc_str = service.addon.getLocalizedString(30519) # 'Create new group'
+        value = xbmcgui.Dialog().input(loc_str, defaultt='')
+        if value == '' or value in channel['all_groups']:
+            return
+        url += quote(value)
+    elif _property == 'remove_groups':
+        all_groups = channel['all_groups']
+        loc_str = service.addon.getLocalizedString(30520) # 'Remove chosen groups'
+        indexes = xbmcgui.Dialog().multiselect(loc_str, all_groups)
+        if indexes is None:
+            return
+        values = [value for index, value in enumerate(all_groups) if index in indexes]
+        if values == []:
+            return
+        loc_str_1 = service.addon.getLocalizedString(30114) # 'Warning'
+        loc_str_2 = service.addon.getLocalizedString(30118) # 'It will remove chosen groups from all channels. Continue?'
+        loc_str_3 = service.addon.getLocalizedString(30112) # 'Yes'
+        loc_str_4 = service.addon.getLocalizedString(30113) # 'No'
+        result = xbmcgui.Dialog().yesno(loc_str_1, loc_str_2, yeslabel=loc_str_3, nolabel=loc_str_4)
+        if not result:
+            return
+        url += quote(';'.join(values))
 
     requests.get(url)
 

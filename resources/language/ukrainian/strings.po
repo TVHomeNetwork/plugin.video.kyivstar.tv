@@ -250,6 +250,10 @@ msgctxt "#30117"
 msgid "You have unsaved changes. If you proceed, you will lose it. Continue?"
 msgstr "У вас є незбережені зміни. Якщо ви продовжите, ви їх втратите. Продовжити?"
 
+msgctxt "#30118"
+msgid "It will remove chosen groups from all channels. Continue?"
+msgstr "Це видалить вибрані групи з усіх каналів. Продовжити?"
+
 # Notifications
 msgctxt "#30200"
 msgid "For login you must set phonenumber."
@@ -364,6 +368,22 @@ msgstr "Номер"
 msgctxt "#30514"
 msgid "Move"
 msgstr "Перемістити"
+
+msgctxt "#30517"
+msgid "Include/exclude groups"
+msgstr "Включити/виключити групи"
+
+msgctxt "#30518"
+msgid "Rename group"
+msgstr "Перейменувати групу"
+
+msgctxt "#30519"
+msgid "Create new group"
+msgstr "Створити нову групу"
+
+msgctxt "#30520"
+msgid "Remove chosen groups"
+msgstr "Видалити обрані групи"
 
 msgctxt "#30512"
 msgid "Change channel name"
