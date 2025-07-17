@@ -50,13 +50,16 @@ class Channel():
             self.chno = match.group().split('"')[1]
         match = re.search('group-title=".*?"', text)
         if match:
-            self.groups = match.group().split('"')[1].split(';')
+            value = match.group().split('"')[1]
+            self.groups = value.split(';') if value != '' else []
         if 'catchup=' in text:
             self.catchup = True
 
     def write(self):
         base_url = 'plugin://plugin.video.kyivstar.tv/play/%s-%s|' % (self.id, self.type)
-        groups = 'group-title="%s"' % ';'.join(self.groups)
+        groups = ''
+        if len(self.groups) > 0:
+            groups = 'group-title="%s"' % ';'.join(self.groups)
         chno = ''
         if self.chno != '':
             chno = 'tvg-chno="%s"' % self.chno
