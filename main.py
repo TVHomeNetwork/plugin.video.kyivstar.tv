@@ -432,6 +432,8 @@ def show_channel(asset):
     loc_str = service.addon.getLocalizedString(30507) # 'Preview'
     li = xbmcgui.ListItem(label=loc_str)
     li.setProperty('IsPlayable', 'true')
+    icon = service.addon.getAddonInfo('path') + '/resources/images/preview.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(play, videoid='%s-%s|null' % (channel['id'], channel['type']))
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
@@ -439,11 +441,17 @@ def show_channel(asset):
     if not channel['enabled']:
         loc_str = service.addon.getLocalizedString(30509) # 'Disabled'
     li = xbmcgui.ListItem(label=loc_str)
+    icon = service.addon.getAddonInfo('path') + '/resources/images/enabled.png'
+    if not channel['enabled']:
+        icon = service.addon.getAddonInfo('path') + '/resources/images/disabled.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(update_channel, asset=channel['id'], _property='enabled')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
     loc_str = service.addon.getLocalizedString(30510) # 'Name'
     li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, channel['name']))
+    icon = service.addon.getAddonInfo('path') + '/resources/images/name.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(update_channel, asset=channel['id'], _property='name')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
@@ -455,6 +463,8 @@ def show_channel(asset):
 
     loc_str = service.addon.getLocalizedString(30515) # 'Number'
     li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, channel['chno']))
+    icon = service.addon.getAddonInfo('path') + '/resources/images/chno.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(update_channel, asset=channel['id'], _property='chno')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
@@ -462,27 +472,37 @@ def show_channel(asset):
     if movable:
         loc_str = service.addon.getLocalizedString(30514) # 'Move'
         li = xbmcgui.ListItem(label=loc_str)
+        icon = service.addon.getAddonInfo('path') + '/resources/images/move.png'
+        li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
         url = plugin.url_for(update_channel, asset=channel['id'], _property='move')
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
     groups = ';'.join(channel['groups'])
     loc_str = service.addon.getLocalizedString(30517) # 'Include/exclude groups'
     li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, groups))
+    icon = service.addon.getAddonInfo('path') + '/resources/images/group-include-exclude.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(update_channel, asset=channel['id'], _property='groups')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
     loc_str = service.addon.getLocalizedString(30518) # 'Rename group'
     li = xbmcgui.ListItem(label=loc_str)
+    icon = service.addon.getAddonInfo('path') + '/resources/images/group-rename.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(update_channel, asset=channel['id'], _property='rename_group')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
     loc_str = service.addon.getLocalizedString(30519) # 'Create new group'
     li = xbmcgui.ListItem(label=loc_str)
+    icon = service.addon.getAddonInfo('path') + '/resources/images/group-create.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(update_channel, asset=channel['id'], _property='create_group')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
     loc_str = service.addon.getLocalizedString(30520) # 'Remove chosen groups'
     li = xbmcgui.ListItem(label=loc_str)
+    icon = service.addon.getAddonInfo('path') + '/resources/images/group-remove.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(update_channel, asset=channel['id'], _property='remove_groups')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
