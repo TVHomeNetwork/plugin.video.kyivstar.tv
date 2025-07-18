@@ -221,6 +221,7 @@ class ChannelManager():
         if len(all_channels) == 0:
             return False
 
+        groups = set()
         update_existing_channels = service.addon.getSetting('update_existing_channels') == 'true'
         for channel in all_channels.values():
             asset_id = channel.get('assetId', None)
@@ -233,6 +234,8 @@ class ChannelManager():
                 self.new.append(self.all[asset_id])
                 self.all[asset_id].update(channel)
                 self.changed = True
+            groups.update(self.all[asset_id].groups)
+        self.groups = list(groups)
 
         for channel in self.all.values():
             if channel.id in all_channels:
