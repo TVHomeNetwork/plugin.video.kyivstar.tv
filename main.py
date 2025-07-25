@@ -321,6 +321,13 @@ def root():
     url = plugin.url_for(show_channel_manager)
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
+    loc_str = 'Settings'
+    li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
+    #icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
+    #li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+    url = plugin.url_for(show_settings)
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
     xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
 
 @plugin.route('/channel_manager')
@@ -615,6 +622,10 @@ def move_channel(asset, position):
 
     path = 'plugin://%s/channel_manager' % service.addon.getAddonInfo('id')
     xbmc.executebuiltin('Container.Update("%s", "replace")' % path)
+
+@plugin.route('/settings')
+def show_settings():
+    service.addon.openSettings()
 
 if __name__ == '__main__':
     plugin.run()
