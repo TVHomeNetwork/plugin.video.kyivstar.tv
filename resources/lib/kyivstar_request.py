@@ -111,6 +111,63 @@ class KyivstarRequest:
         finally:
             return result
 
+    def get_content_area_filters(self, session_id, area_id):
+        result = []
+        try:
+            url = self.base_api_url.format('filters;jsessionid=%s' % session_id)
+            json_data = {
+                'contentAreaId':area_id
+                }
+            response = requests.post(url, json=json_data, headers=self.headers)
+            if response.status_code == 200:
+                result = response.json()
+            else:
+                response.raise_for_status()
+        except Exception as e:
+            xbmc.log("KyivstarRequest exception in get_content_area_filters: " + str(e), xbmc.LOGERROR)
+        finally:
+            return result
+
+    def get_compilations(self, session_id, area_id):
+        result = []
+        try:
+            url = self.base_api_url.format('compilations;jsessionid=%s' % session_id)
+            json_data = {
+                'contentAreaId':area_id,
+                'compilationGroupType' : 'CRISPS'
+                }
+            response = requests.post(url, json=json_data, headers=self.headers)
+            if response.status_code == 200:
+                result = response.json()
+            else:
+                response.raise_for_status()
+        except Exception as e:
+            xbmc.log("KyivstarRequest exception in get_compilations: " + str(e), xbmc.LOGERROR)
+        finally:
+            return result
+
+    def get_content_area_elems(self, session_id, compilation, filters, sort, offset, limit, sort_order=None):
+        result = []
+        try:
+            url = self.base_api_url.format('gallery/filters/content-area;jsessionid=%s' % session_id)
+            json_data = {
+                'compilationElementId' : compilation,
+                'filterElementIds' : filters,
+                'filterSortElementId' : sort,
+                'offset' : offset,
+                'limit' : limit,
+                'sortOrder' : sort_order
+                }
+            response = requests.post(url, json=json_data, headers=self.headers)
+            if response.status_code == 200:
+                result = response.json()
+            else:
+                response.raise_for_status()
+        except Exception as e:
+            xbmc.log("KyivstarRequest exception in get_content_area_elems: " + str(e), xbmc.LOGERROR)
+        finally:
+            return result
+
 # Get requests
 
     def logout(self, session_id):
@@ -140,6 +197,34 @@ class KyivstarRequest:
             xbmc.log("KyivstarRequest exception in get_profiles: " + str(e), xbmc.LOGERROR)
         finally:
             return profiles
+
+    def get_content_areas(self, session_id):
+        areas = []
+        try:
+            url = self.base_api_url.format('contentareas;jsessionid=%s' % session_id)
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                areas = response.json()
+            else:
+                response.raise_for_status()
+        except Exception as e:
+            xbmc.log("KyivstarRequest exception in get_content_areas: " + str(e), xbmc.LOGERROR)
+        finally:
+            return areas
+
+    def get_sort_filters(self, session_id):
+        sort_filters = []
+        try:
+            url = self.base_api_url.format('filters/sort-elements;jsessionid=%s' % session_id)
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                sort_filters = response.json()
+            else:
+                response.raise_for_status()
+        except Exception as e:
+            xbmc.log("KyivstarRequest exception in get_sort_filters: " + str(e), xbmc.LOGERROR)
+        finally:
+            return sort_filters
 
     def get_live_channels_groups(self, session_id):
         groups = []

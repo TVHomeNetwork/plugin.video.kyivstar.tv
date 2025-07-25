@@ -7,7 +7,7 @@ import xbmcgui
 import xbmcplugin
 import xbmcvfs
 
-from urllib.parse import quote
+from urllib.parse import quote, parse_qs, urlencode
 from resources.lib.kyivstar_service import KyivstarService
 
 service = KyivstarService()
@@ -314,6 +314,13 @@ def play(videoid):
 
 @plugin.route('')
 def root():
+    loc_str = 'Videos'
+    li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
+    #icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
+    #li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+    url = plugin.url_for(show_videos, area=None)
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
     loc_str = service.addon.getLocalizedString(30500) # 'Channel manager'
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
     icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
@@ -328,6 +335,151 @@ def root():
     url = plugin.url_for(show_settings)
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
+    xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
+
+@plugin.route('/videos/<area>')
+def show_videos(area):
+    session_id = service.addon.getSetting('session_id')
+
+    if area == 'None':
+        area = None
+
+    query = ''
+    if len(sys.argv) > 2:
+        query = sys.argv[2][1:]
+    args = parse_qs(query)
+
+    compilation = args.get('compilation', [None])[0]
+    if 'filters' not in args:
+        args['filters'] = []
+    filters = args['filters']
+    sort = args.get('sort', [None])[0]
+    offset = int(args.get('offset', [0])[0])
+    limit = int(args.get('limit', [20])[0])
+    select = args.get('select', [None])[0]
+
+    locale = service.addon.getSetting('locale')
+    controls = {
+        'filters' : { 'en_US' : 'Filters', 'uk_UA' : 'Фільтри', 'ru_RU' : 'Фильтры' },
+        'compilations' : { 'en_US' : 'Selections', 'uk_UA' : 'Підбірки', 'ru_RU' : 'Подборки' },
+        'sort' : { 'en_US' : 'Sorting', 'uk_UA' : 'Сортування', 'ru_RU' : 'Cортировка' },
+        }
+
+    if select == 'filters':
+        filter_types = service.request.get_content_area_filters(session_id, area)
+
+        filter_names = []
+        for filter_type in filter_types:
+            names = [i['displayName'] for i in filter_type['filterElements'] if i['id'] in filters]
+            filter_names.append('%s(%s)' % (filter_type['displayName'], ', '.join(names)))
+        heading = controls[select][locale]
+        index = xbmcgui.Dialog().select(heading, filter_names)
+        if index < 0:
+            return
+
+        filter_type = filter_types[index]
+        heading = filter_type['displayName']
+        preselect = []
+        elems = []
+        names = []
+        for i in filter_type['filterElements']:
+            if i['discriminator'] == 'TagsFilterElementEntity':
+                continue
+            names.append(i['displayName'])
+            elems.append(i)
+            if i['id'] in filters:
+                preselect.append(len(elems) - 1)
+        indexes = []
+        if filter_type['multiSelectionEnabled']:
+            indexes = xbmcgui.Dialog().multiselect(heading, names, 0, preselect)
+        else:
+            index = xbmcgui.Dialog().select(heading, names, 0, preselect[0] if len(preselect) > 0 else -1)
+            indexes = [index] if index >= 0 else None
+        if indexes is None:
+            return
+        if indexes == preselect:
+            return
+
+        for index, elem in enumerate(elems):
+            if index in indexes and elem['id'] not in filters:
+                args['filters'].append(elem['id'])
+            elif index not in indexes and elem['id'] in filters:
+                args['filters'].remove(elem['id'])
+        del args['select']
+        url = plugin.url_for(show_videos, area=area)
+        url += '?{}'.format(urlencode(args, doseq=True))
+        xbmc.executebuiltin('Container.Update("%s")' % url)
+
+    elif select == 'compilations':
+        compilations = service.request.get_compilations(session_id, area)
+        compilations = [i for i in compilations if i['compilationElementType'] != 'CONTENT_GROUP']
+
+        names = [i['displayName'] for i in compilations]
+        heading = controls[select][locale]
+        index = xbmcgui.Dialog().select(heading, names)
+        if index < 0:
+            return
+
+        args['compilation'] = compilations[index]['id']
+        del args['select']
+        url = plugin.url_for(show_videos, area=area)
+        url += '?{}'.format(urlencode(args, doseq=True))
+        xbmc.executebuiltin('Container.Update("%s")' % url)
+
+    elif select == 'sort':
+        sort_filters = service.request.get_sort_filters(session_id)
+
+        names = [i['displayName'] for i in sort_filters]
+        heading = controls[select][locale]
+        index = xbmcgui.Dialog().select(heading, names)
+        if index < 0:
+            return
+
+        args['sort'] = sort_filters[index]['id']
+        del args['select']
+        url = plugin.url_for(show_videos, area=area)
+        url += '?{}'.format(urlencode(args, doseq=True))
+        xbmc.executebuiltin('Container.Update("%s")' % url)
+
+    if offset == 0:
+        for key in controls:
+            li = xbmcgui.ListItem(label=controls[key][locale])
+            #icon = service.addon.getAddonInfo('path') + '/resources/images/name.png'
+            #li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+            args['select'] = key
+            url = plugin.url_for(show_videos, area=area)
+            url += '?{}'.format(urlencode(args, doseq=True))
+            del args['select']
+            xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    elems = service.request.get_content_area_elems(session_id, compilation, filters, sort, offset, limit)
+    for elem in elems:
+        li = xbmcgui.ListItem(label=elem['name'])
+        video_info = li.getVideoInfoTag()
+        if 'releaseDate' in elem:
+            video_info.setYear(elem['releaseDate'])
+        if 'ratings' in elem:
+            rating = elem['ratings'][0]
+            video_info.setRating(rating['movieRating'], rating['numberOfVotes'], rating['ratingProviderType'].lower())
+        video_info.setPlot(elem['shortPlot'])
+        video_info.setTitle(elem['name'])
+        image = next(iter([i['url'] for i in elem['images'] if '2_3_XL' in i['url']]), '')
+        li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
+        li.setProperty('IsPlayable', 'true')
+        url = plugin.url_for(play, videoid='%s-VIRTUAL|-1' % elem['assetId'])
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    if len(elems) == limit:
+        loc_str = 'Next'
+        li = xbmcgui.ListItem(label=loc_str)
+        #icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
+        #li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+        args['offset'] = offset + len(elems)
+        url = plugin.url_for(show_videos, area=area)
+        url += '?{}'.format(urlencode(args, doseq=True))
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    xbmcplugin.setContent(handle, 'videos')
     xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
 
 @plugin.route('/channel_manager')
