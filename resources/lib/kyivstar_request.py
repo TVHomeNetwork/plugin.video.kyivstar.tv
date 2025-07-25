@@ -196,12 +196,17 @@ class KyivstarRequest:
             if date:
                 url += '&date=%s' % date
             response = requests.get(url, headers=self.headers)
+            data = response.json()
             if response.status_code == 200:
+                if 'error' in data:
+                    raise Exception(data['description'])
                 if virtual:
-                    result = response.json()['media'][0]['url']
+                    result = data['media'][0]['url']
                 else:
-                    result = response.json()['liveChannelUrl']
+                    result = data['liveChannelUrl']
             else:
+                if data and 'error' in data:
+                    raise Exception(data['description'])
                 response.raise_for_status()
         except Exception as e:
             xbmc.log("KyivstarRequest exception in get_elem_stream_url: " + str(e), xbmc.LOGERROR)
