@@ -314,6 +314,13 @@ def play(videoid):
 
 @plugin.route('')
 def root():
+    loc_str = 'Search'
+    li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
+    #icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
+    #li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+    url = plugin.url_for(search, query='')
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
     loc_str = 'Videos'
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
     #icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
@@ -335,6 +342,35 @@ def root():
     url = plugin.url_for(show_settings)
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
+    xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
+
+@plugin.route('/search')
+def search():
+    loc_str = 'Input search query'
+    query = xbmcgui.Dialog().input(loc_str)
+    if query == '':
+        return
+
+    session_id = service.addon.getSetting('session_id')
+    elems = service.request.get_search(session_id, query)
+    for elem in elems:
+        if elem['assetType'] != 'MOVIE' and elem['assetType'] != 'SERIES':
+            continue
+        li = xbmcgui.ListItem(label=elem['name'])
+        video_info = li.getVideoInfoTag()
+        if 'releaseDate' in elem:
+            video_info.setYear(elem['releaseDate'])
+        if 'ratings' in elem:
+            rating = elem['ratings'][0]
+            video_info.setRating(rating['movieRating'], rating['numberOfVotes'], rating['ratingProviderType'].lower())
+        video_info.setTitle(elem['name'])
+        image = next(iter([i['url'] for i in elem['images'] if '2_3_XL' in i['url']]), '')
+        li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
+        li.setProperty('IsPlayable', 'true')
+        url = plugin.url_for(play, videoid='%s-VIRTUAL|-1' % elem['assetId'])
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    xbmcplugin.setContent(handle, 'videos')
     xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
 
 @plugin.route('/videos/<area>')

@@ -314,3 +314,17 @@ class KyivstarRequest:
             xbmc.log("KyivstarRequest exception in get_elem_stream_url: " + str(e), xbmc.LOGERROR)
         finally:
             return result
+
+    def get_search(self, session_id, query):
+        result = []
+        try:
+            url = self.base_api_url.format('api/v1/search/predictive;jsessionid=%s?q=%s&limit=50&includeLiveChannels=true' % (session_id, query))
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                result = response.json()
+            else:
+                response.raise_for_status()
+        except Exception as e:
+            xbmc.log("KyivstarRequest exception in get_search: " + str(e), xbmc.LOGERROR)
+        finally:
+            return result
