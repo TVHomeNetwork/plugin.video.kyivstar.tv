@@ -259,23 +259,16 @@ class KyivstarService:
         channel_manager = ChannelManager()
         channel_manager.load(self.m3u_file_path)
 
-        assets = []
+        channels = []
 
         for channel in channel_manager.enabled:
             xml_channel = etree.SubElement(xml_root, "channel", attrib={"id": channel.id})
             etree.SubElement(xml_channel, "display-name").text = channel.name
             etree.SubElement(xml_channel, "icon", src=channel.logo)
-
-            #only VIRTUAL channels must have catchup-id in epg
-            catchup_avaliable = channel.catchup and channel.type == 'VIRTUAL'
-
-            assets.append({
-                'id': channel.id,
-                'catchup':catchup_avaliable
-            })
+            channels.append(channel)
 
         self.save_epg_xml_root = xml_root
-        self.save_epg_assets = assets
+        self.save_epg_channels = channels
         self.save_epg_index = 0
         self.save_epg_file_path = self.epg_file_path
         self.save_epg_include_desc = self.addon.getSetting('epg_include_description') == 'true'
@@ -284,49 +277,41 @@ class KyivstarService:
     def step_save_epg(self):
         session_id = self.addon.getSetting('session_id')
 
-        i = self.save_epg_index
-        end_step = i + int(self.addon.getSetting('epg_group_requests_count'))
-        assets = self.save_epg_assets
-        length_assets = len(assets)
-        if end_step > length_assets:
-            end_step = length_assets
+        channels = self.save_epg_channels
+        channels_count = len(channels)
+
+        end_step = self.save_epg_index + int(self.addon.getSetting('epg_group_requests_count'))
+        if end_step > channels_count:
+            end_step = channels_count
+
         xml_root = self.save_epg_xml_root
 
-        while i < end_step:
-            asset_id = assets[i]['id']
-            catchup_avaliable = assets[i]['catchup']
-            epg_data = self.request.get_elem_epg_data(session_id, asset_id)
+        for i in range(self.save_epg_index, end_step):
+            channel = channels[i]
+            epg_data = self.request.get_elem_epg_data(session_id, channel.id)
 
             if len(epg_data) == 0:
-                xbmc.log("KyivstarService step_save_epg: asset %s does not have epg data. " % (asset_id), xbmc.LOGINFO)
-                i += 1
+                xbmc.log("KyivstarService step_save_epg: asset %s(%s) does not have epg data. " % (channel.id, channel.name), xbmc.LOGINFO)
                 continue
 
+
             for epg_day_data in epg_data:
-                if 'programList' not in epg_day_data:
-                    continue
-
-                if len(epg_day_data['programList']) == 0:
-                    continue
-
-                for program in epg_day_data['programList']:
+                program_list = epg_day_data.get('programList', [])
+                for program in program_list:
                     program_attrib = {
                         "start": time.strftime('%Y%m%d%H%M%S', time.gmtime(program['start']/1000)) + " +0000",
                         "stop": time.strftime('%Y%m%d%H%M%S', time.gmtime(program['finish']/1000)) + " +0000",
-                        "channel": asset_id
+                        "channel": channel.id
                     }
-                    if catchup_avaliable:
-                        program_attrib.update({
-                            'catchup-id':str(int(program['start']/1000))
-                        })
+                    if channel.catchup and channel.type == 'VIRTUAL':
+                        program_attrib['catchup-id'] = str(int(program['start']/1000))
                     xml_program = etree.SubElement(xml_root, "programme", attrib=program_attrib)
                     etree.SubElement(xml_program, "title").text = program['title']
                     if self.save_epg_include_desc:
                         etree.SubElement(xml_program, "desc").text = strip_html(program['desc'])
-            i += 1
-        self.save_epg_index = i
+        self.save_epg_index = end_step
 
-        if i < length_assets:
+        if self.save_epg_index < channels_count:
             return
 
         tree = etree.ElementTree(xml_root)
@@ -340,7 +325,7 @@ class KyivstarService:
 
         self.save_epg_index = -1
         del self.save_epg_xml_root
-        del self.save_epg_assets
+        del self.save_epg_channels
 
         if self.addon.getSetting('iptv_sc_reload_when_epg_saved') == 'true':
             xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":false}}')
@@ -407,7 +392,7 @@ class KyivstarService:
                     if self.save_epg_index >= 0:
                         self.save_epg_index = -1
                         del self.save_epg_xml_root
-                        del self.save_epg_assets
+                        del self.save_epg_channels
                     self.save_epg()
 
                 wait_time = 60
