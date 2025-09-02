@@ -1,4 +1,5 @@
 import sys
+import traceback
 import random
 import re
 import time
@@ -417,7 +418,8 @@ class KyivstarService:
 
             except Exception as e:
                 exc_type, exc_obj, exc_tb = sys.exc_info()
-                xbmc.log("KyivstarService exception (line %s): %s" % (exc_tb.tb_lineno,str(e)), xbmc.LOGERROR)
+                xbmc.log("KyivstarService exception (line %s): %s" % (exc_tb.tb_lineno, str(e)), xbmc.LOGERROR)
+                xbmc.log("KyivstarService call trace: %s" % (traceback.format_exc()), xbmc.LOGERROR)
 
         self.live_stream_server.stop()
         if self.m3u_file_path and self.channel_manager.changed and self.addon.getSetting('autosave_changes_on_exit') == 'true':
