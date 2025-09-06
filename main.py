@@ -314,14 +314,14 @@ def play(videoid):
 
 @plugin.route('')
 def root():
-    loc_str = 'Search'
+    loc_str = service.addon.getLocalizedString(30521) # 'Search'
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
     icon = service.addon.getAddonInfo('path') + '/resources/images/search.png'
     li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(search, query='')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
-    loc_str = 'Videos'
+    loc_str = service.addon.getLocalizedString(30522) # 'Videos'
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
     icon = service.addon.getAddonInfo('path') + '/resources/images/videos.png'
     li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
@@ -335,7 +335,7 @@ def root():
     url = plugin.url_for(show_channel_manager)
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
-    loc_str = 'Settings'
+    loc_str = service.addon.getLocalizedString(30524) # 'Settings'
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
     icon = service.addon.getAddonInfo('path') + '/resources/images/settings.png'
     li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
@@ -346,7 +346,7 @@ def root():
 
 @plugin.route('/search')
 def search():
-    loc_str = 'Input search query'
+    loc_str = service.addon.getLocalizedString(30525) # 'Input search query'
     query = xbmcgui.Dialog().input(loc_str)
     if query == '':
         return
@@ -506,8 +506,8 @@ def show_videos(area):
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
     if len(elems) == limit:
-        loc_str = 'Next'
-        li = xbmcgui.ListItem(label=loc_str)
+        control_next = { 'en_US' : 'Next', 'uk_UA' : 'Наступна', 'ru_RU' : 'Следующая' }
+        li = xbmcgui.ListItem(label=control_next[locale])
         icon = service.addon.getAddonInfo('path') + '/resources/images/next.png'
         li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
         args['offset'] = offset + len(elems)
