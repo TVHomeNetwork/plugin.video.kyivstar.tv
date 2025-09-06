@@ -328,3 +328,17 @@ class KyivstarRequest:
             xbmc.log("KyivstarRequest exception in get_search: " + str(e), xbmc.LOGERROR)
         finally:
             return result
+
+    def get_asset_info(self, session_id, asset_id):
+        result = []
+        try:
+            url = self.base_api_url.format('assets/v2;jsessionid=%s?movie=%s' % (session_id, asset_id))
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                result = response.json()
+            else:
+                response.raise_for_status()
+        except Exception as e:
+            xbmc.log("KyivstarRequest exception in get_asset_info: " + str(e), xbmc.LOGERROR)
+        finally:
+            return result
