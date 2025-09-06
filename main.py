@@ -316,15 +316,15 @@ def play(videoid):
 def root():
     loc_str = 'Search'
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
-    #icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
-    #li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+    icon = service.addon.getAddonInfo('path') + '/resources/images/search.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(search, query='')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
     loc_str = 'Videos'
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
-    #icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
-    #li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+    icon = service.addon.getAddonInfo('path') + '/resources/images/videos.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(show_videos, area=None)
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
@@ -337,8 +337,8 @@ def root():
 
     loc_str = 'Settings'
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
-    #icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
-    #li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+    icon = service.addon.getAddonInfo('path') + '/resources/images/settings.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(show_settings)
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
@@ -396,9 +396,9 @@ def show_videos(area):
 
     locale = service.addon.getSetting('locale')
     controls = {
-        'filters' : { 'en_US' : 'Filters', 'uk_UA' : 'Фільтри', 'ru_RU' : 'Фильтры' },
-        'compilations' : { 'en_US' : 'Selections', 'uk_UA' : 'Підбірки', 'ru_RU' : 'Подборки' },
-        'sort' : { 'en_US' : 'Sorting', 'uk_UA' : 'Сортування', 'ru_RU' : 'Cортировка' },
+        'filters' : { 'en_US' : 'Filters', 'uk_UA' : 'Фільтри', 'ru_RU' : 'Фильтры', 'icon' : '/resources/images/filters.png' },
+        'compilations' : { 'en_US' : 'Selections', 'uk_UA' : 'Підбірки', 'ru_RU' : 'Подборки', 'icon' : '/resources/images/compilations.png' },
+        'sort' : { 'en_US' : 'Sorting', 'uk_UA' : 'Сортування', 'ru_RU' : 'Cортировка', 'icon' : '/resources/images/sort.png' },
         }
 
     if select == 'filters':
@@ -480,8 +480,8 @@ def show_videos(area):
     if offset == 0:
         for key in controls:
             li = xbmcgui.ListItem(label=controls[key][locale])
-            #icon = service.addon.getAddonInfo('path') + '/resources/images/name.png'
-            #li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+            icon = service.addon.getAddonInfo('path') + controls[key]['icon']
+            li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
             args['select'] = key
             url = plugin.url_for(show_videos, area=area)
             url += '?{}'.format(urlencode(args, doseq=True))
@@ -508,8 +508,8 @@ def show_videos(area):
     if len(elems) == limit:
         loc_str = 'Next'
         li = xbmcgui.ListItem(label=loc_str)
-        #icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
-        #li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+        icon = service.addon.getAddonInfo('path') + '/resources/images/next.png'
+        li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
         args['offset'] = offset + len(elems)
         url = plugin.url_for(show_videos, area=area)
         url += '?{}'.format(urlencode(args, doseq=True))
