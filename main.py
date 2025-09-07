@@ -318,7 +318,7 @@ def root():
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
     icon = service.addon.getAddonInfo('path') + '/resources/images/search.png'
     li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
-    url = plugin.url_for(search, query='')
+    url = plugin.url_for(search)
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
     loc_str = service.addon.getLocalizedString(30522) # 'Videos'
@@ -358,6 +358,12 @@ def search():
     if query == '':
         return
 
+    url = plugin.url_for(do_search, query=query)
+    xbmc.executebuiltin('Container.Update("%s", "replace")' % url)
+    xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
+
+@plugin.route('/search/<query>')
+def do_search(query):
     session_id = service.addon.getSetting('session_id')
     elems = service.request.get_search(session_id, query)
     for elem in elems:
