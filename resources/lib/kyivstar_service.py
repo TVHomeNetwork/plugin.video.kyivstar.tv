@@ -13,6 +13,7 @@ import xml.etree.ElementTree as etree
 from resources.lib.kyivstar_request import KyivstarRequest
 from resources.lib.kyivstar_http_server import KyivstarHttpServer
 from resources.lib.channel_manager import ChannelManager
+from resources.lib.archive_manager import ArchiveManager
 from resources.lib.common import strip_html
 
 class KyivstarServiceMonitor(xbmc.Monitor):
@@ -232,6 +233,18 @@ class KyivstarService:
         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
         xbmc.log("KyivstarService: Saving M3U completed.", xbmc.LOGDEBUG)
 
+    def get_enabled_channels(self):
+        if self.get_session_status() == KyivstarService.SESSION_EMPTY:
+            return []
+
+        if not self.m3u_file_path:
+            return []
+
+        channel_manager = ChannelManager()
+        channel_manager.load(self.m3u_file_path)
+
+        return channel_manager.enabled
+
     def save_epg(self):
         if self.get_session_status() == KyivstarService.SESSION_EMPTY:
             loc_str = self.addon.getLocalizedString(30204) # 'Log in to the plugin'
@@ -294,6 +307,7 @@ class KyivstarService:
                 xbmc.log("KyivstarService step_save_epg: asset %s(%s) does not have epg data. " % (channel.id, channel.name), xbmc.LOGINFO)
                 continue
 
+            self.archive_manager.update_programs(channel, epg_data)
 
             for epg_day_data in epg_data:
                 program_list = epg_day_data.get('programList', [])
@@ -332,6 +346,8 @@ class KyivstarService:
             time.sleep(1)
             xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":true}}')
 
+        self.archive_manager.check_programs(True)
+
         loc_str = self.addon.getLocalizedString(30211) # 'Save EPG completed.'
         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
         xbmc.log("KyivstarService: Saving EPG completed.", xbmc.LOGDEBUG)
@@ -339,6 +355,12 @@ class KyivstarService:
     def run(self):
         monitor = KyivstarServiceMonitor(self)
         self.channel_manager = ChannelManager()
+
+        self.archive_manager = ArchiveManager()
+        uset_data_path = xbmcvfs.translatePath(self.addon.getAddonInfo('profile'))
+        self.archive_manager.open(uset_data_path)
+        self.archive_manager.check_channels(True)
+        self.archive_manager.check_programs(True)
 
         check_session_timer = 0
         self.check_session_status()
@@ -395,8 +417,14 @@ class KyivstarService:
                         del self.save_epg_channels
                     self.save_epg()
 
+                if self.save_epg_index < 0:
+                    if self.archive_manager.check_channels():
+                        self.archive_manager.process_channel(self)
+                    elif self.archive_manager.check_programs():
+                        self.archive_manager.process_program(self)
+
                 wait_time = 60
-                if self.save_epg_index >= 0:
+                if self.save_epg_index >= 0 or self.archive_manager.check_programs() or self.archive_manager.check_channels():
                     wait_time = self.addon.getSettingInt('epg_group_requests_delay')
                 if monitor.waitForAbort(wait_time):
                     break
@@ -406,6 +434,7 @@ class KyivstarService:
                 xbmc.log("KyivstarService exception (line %s): %s" % (exc_tb.tb_lineno, str(e)), xbmc.LOGERROR)
                 xbmc.log("KyivstarService call trace: %s" % (traceback.format_exc()), xbmc.LOGERROR)
 
+        self.archive_manager.close()
         self.live_stream_server.stop()
         if self.m3u_file_path and self.channel_manager.changed and self.addon.getSetting('autosave_changes_on_exit') == 'true':
             self.channel_manager.save(self.m3u_file_path)

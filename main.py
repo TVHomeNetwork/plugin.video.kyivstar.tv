@@ -328,6 +328,13 @@ def root():
     url = plugin.url_for(show_videos, area=None)
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
+    loc_str = service.addon.getLocalizedString(30523) # 'Channel archive'
+    li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
+    icon = service.addon.getAddonInfo('path') + '/resources/images/archive.png'
+    li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+    url = plugin.url_for(show_archive)
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
     loc_str = service.addon.getLocalizedString(30500) # 'Channel manager'
     li = xbmcgui.ListItem(label='[B]%s[/B]' % loc_str)
     icon = service.addon.getAddonInfo('path') + '/resources/images/channel-manager.png'
@@ -512,6 +519,211 @@ def show_videos(area):
         li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
         args['offset'] = offset + len(elems)
         url = plugin.url_for(show_videos, area=area)
+        url += '?{}'.format(urlencode(args, doseq=True))
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    xbmcplugin.setContent(handle, 'videos')
+    xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
+
+@plugin.route('/channel_archive')
+def show_archive():
+    query = ''
+    if len(sys.argv) > 2:
+        query = sys.argv[2][1:]
+    args = parse_qs(query)
+
+    if 'filters' not in args:
+        args['filters'] = []
+    filters = args['filters']
+    if 'sort' not in args:
+        args['sort'] = ['name']
+    sort = args['sort'][0]
+    if 'order' not in args:
+        args['order'] = ['asc']
+    sort_order = args['order'][0]
+    offset = int(args.get('offset', [0])[0])
+    limit = int(args.get('limit', [20])[0])
+    select = args.get('select', [None])[0]
+
+    locale = service.addon.getSetting('locale')
+    controls = {
+        'filters' : { 'en_US' : 'Filters', 'uk_UA' : 'Фільтри', 'ru_RU' : 'Фильтры', 'icon' : '/resources/images/filters.png' },
+        'sort' : { 'en_US' : 'Sorting', 'uk_UA' : 'Сортування', 'ru_RU' : 'Cортировка', 'icon' : '/resources/images/sort.png' },
+        'channels' : { 'en_US' : 'Channels', 'uk_UA' : 'Канали', 'ru_RU' : 'Каналы', 'icon' : '/resources/images/channels.png' },
+        }
+
+    filter_types = {
+        'genre' : { 'en_US' : 'Genre', 'uk_UA' : 'Жанр', 'ru_RU' : 'Жанр' },
+        'year' : { 'en_US' : 'Year', 'uk_UA' : 'Рік', 'ru_RU' : 'Год' },
+        'duration' : { 'en_US' : 'Duration', 'uk_UA' : 'Тривалість', 'ru_RU' : 'Продолжительность' },
+        'channel' : { 'en_US' : 'Channel', 'uk_UA' : 'Канал', 'ru_RU' : 'Канал' },
+    }
+
+    sort_types = {
+        'name' : { 'en_US' : 'By name', 'uk_UA' : 'За назвою', 'ru_RU' : 'По названию' },
+        'release_date' : { 'en_US' : 'By release date', 'uk_UA' : 'За датою виходу', 'ru_RU' : 'По дате выхода' },
+        'duration' : { 'en_US' : 'By duration', 'uk_UA' : 'За тривалістю', 'ru_RU' : 'По продолжительности' },
+        'channel_id' : { 'en_US' : 'By channel', 'uk_UA' : 'За каналом', 'ru_RU' : 'По каналу' },
+    }
+
+    sort_order_types = {
+        'asc' : { 'en_US' : 'Ascending', 'uk_UA' : 'За зростанням', 'ru_RU' : 'По возрастанию' },
+        'desc' : { 'en_US' : 'Descending', 'uk_UA' : 'За спаданням', 'ru_RU' : 'По убыванию' },
+    }
+
+    if select == 'filters':
+        filter_type_ids = list(filter_types.keys())
+        filter_type_counts = {id : 0 for id in filter_type_ids}
+        for filter in filters:
+            filter_type = filter.split(':', 1)[0]
+            filter_type_counts[filter_type] += 1
+        names = [filter_types[id][locale] + (' (%s)' % filter_type_counts[id] if filter_type_counts[id] > 0 else '') for id in filter_type_ids]
+
+        heading = controls[select][locale]
+        index = xbmcgui.Dialog().select(heading, names)
+        if index < 0:
+            return
+
+        filter_type = filter_type_ids[index]
+
+        port = service.addon.getSetting('live_stream_server_port')
+        url = 'http://127.0.0.1:%s/get_archive_filters' % port
+        url += '?{}'.format(urlencode({'type': filter_type}, doseq=True))
+        response = requests.get(url)
+        elems = response.json()
+
+        heading = filter_types[filter_type][locale]
+        preselect = []
+        names = []
+        if filter_type == 'channel':
+            channels = service.get_enabled_channels()
+            channels = {channel.id: channel.name for channel in channels}
+        for index, elem in enumerate(elems):
+            if filter_type == 'channel':
+                names.append(channels[elem])
+            elif filter_type == 'year':
+                names.append(str(elem))
+            else:
+                names.append(elem)
+            if f'{filter_type}:{elem}' in filters:
+                preselect.append(index)
+        indexes = xbmcgui.Dialog().multiselect(heading, names, 0, preselect)
+        if indexes is None:
+            return
+        if indexes == preselect:
+            return
+
+        for index, elem in enumerate(elems):
+            filter_elem = f'{filter_type}:{elem}'
+            if index in indexes and filter_elem not in filters:
+                args['filters'].append(filter_elem)
+            elif index not in indexes and filter_elem in filters:
+                args['filters'].remove(filter_elem)
+        del args['select']
+        url = plugin.url_for(show_archive)
+        url += '?{}'.format(urlencode(args, doseq=True))
+        xbmc.executebuiltin('Container.Update("%s")' % url)
+
+    elif select == 'sort':
+        sort_type_ids = list(sort_types.keys())
+        names = [sort_types[id][locale] for id in sort_type_ids]
+        names.append(sort_order_types[sort_order][locale])
+        heading = controls[select][locale]
+        preselect = sort_type_ids.index(sort)
+        index = xbmcgui.Dialog().select(heading, names, 0, preselect)
+        if index < 0:
+            return
+        if index == preselect:
+            return
+
+        if index < len(sort_type_ids):
+            args['sort'] = sort_type_ids[index]
+        else:
+            args['order'] = 'desc' if sort_order == 'asc' else 'asc'
+
+        del args['select']
+        url = plugin.url_for(show_archive)
+        url += '?{}'.format(urlencode(args, doseq=True))
+        xbmc.executebuiltin('Container.Update("%s")' % url)
+
+    elif select == 'channels':
+        channels = service.get_enabled_channels()
+
+        port = service.addon.getSetting('live_stream_server_port')
+        url = 'http://127.0.0.1:%s/get_archive_channels' % port
+        response = requests.get(url)
+        activated_channel_ids = set(response.json())
+
+        names = []
+        preselect = []
+        for index, channel in enumerate(channels):
+            names.append(channel.name)
+            if channel.id in activated_channel_ids:
+                preselect.append(index)
+        heading = controls[select][locale]
+        indexes = xbmcgui.Dialog().multiselect(heading, names, 0, preselect)
+        if indexes is None:
+            return
+        if indexes == preselect:
+            return
+
+        selected_channel_ids = [channels[i].id for i in indexes]
+        port = service.addon.getSetting('live_stream_server_port')
+        url = 'http://127.0.0.1:%s/set_archive_channels' % port
+        url += '?{}'.format(urlencode({'channels': selected_channel_ids}, doseq=True))
+        requests.get(url)
+
+        del args['select']
+        url = plugin.url_for(show_archive)
+        url += '?{}'.format(urlencode(args, doseq=True))
+        xbmc.executebuiltin('Container.Update("%s")' % url)
+
+    if offset == 0:
+        for key in controls:
+            loc_str = '%s'
+            if key == 'filters' and len(filters) > 0:
+                loc_str += ' (%s)' % len(filters)
+            elif key == 'sort':
+                loc_str += ' (%s, %s)' % (sort_types[sort][locale], sort_order_types[sort_order][locale])
+            li = xbmcgui.ListItem(label=loc_str % controls[key][locale])
+            icon = service.addon.getAddonInfo('path') + controls[key]['icon']
+            li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+            args['select'] = key
+            url = plugin.url_for(show_archive)
+            url += '?{}'.format(urlencode(args, doseq=True))
+            del args['select']
+            xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    port = service.addon.getSetting('live_stream_server_port')
+    url = 'http://127.0.0.1:%s/get_archive' % port
+    url += '?{}'.format(urlencode(args, doseq=True))
+    response = requests.get(url)
+    elems = response.json()
+
+    for elem in elems:
+        li = xbmcgui.ListItem(label=elem['name'])
+        video_info = li.getVideoInfoTag()
+        if 'release_date' in elem:
+            video_info.setYear(elem['release_date'])
+        if 'plot' in elem:
+            video_info.setPlot(elem['plot'])
+        if 'name' in elem:
+            video_info.setTitle(elem['name'])
+        if 'duration' in elem:
+            video_info.setDuration(elem['duration'])
+        if 'image' in elem:
+            li.setArt({'icon': elem['image'], 'fanart': service.addon.getAddonInfo('fanart')})
+        li.setProperty('IsPlayable', 'true')
+        url = plugin.url_for(play, videoid=elem['videoid'])
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+    if len(elems) == limit:
+        control_next = { 'en_US' : 'Next', 'uk_UA' : 'Наступна', 'ru_RU' : 'Следующая' }
+        li = xbmcgui.ListItem(label=control_next[locale])
+        icon = service.addon.getAddonInfo('path') + '/resources/images/next.png'
+        li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+        args['offset'] = offset + len(elems)
+        url = plugin.url_for(show_archive)
         url += '?{}'.format(urlencode(args, doseq=True))
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 

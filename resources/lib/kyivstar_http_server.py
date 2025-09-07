@@ -132,6 +132,46 @@ class HttpGetHandler(BaseHTTPRequestHandler):
             channel_manager.download(service)
         return None, ''
 
+    def handle_get_archive(self, url_query):
+        query = parse_qs(unquote(url_query))
+
+        service = self.server.service
+        archive_manager = service.archive_manager
+
+        return 'application/json', json.dumps(archive_manager.get_elements(query, service)).encode('utf-8')
+
+    def handle_get_archive_channels(self):
+        service = self.server.service
+        archive_manager = service.archive_manager
+
+        return 'application/json', json.dumps(archive_manager.get_channels()).encode('utf-8')
+
+    def handle_set_archive_channels(self, url_query):
+        query = parse_qs(url_query)
+        channel_ids = set(query.get('channels', []))
+
+        service = self.server.service
+        archive_manager = service.archive_manager
+
+        channels = service.get_enabled_channels()
+        activated_channel_ids = set(archive_manager.get_channels())
+        for channel in channels:
+            if channel.id in channel_ids and channel.id not in activated_channel_ids:
+                archive_manager.enable_channel(channel)
+            elif channel.id not in channel_ids and channel.id in activated_channel_ids:
+                archive_manager.disable_channel(channel.id)
+
+        return None, ''
+
+    def handle_get_archive_filters(self, url_query):
+        query = parse_qs(url_query)
+        filter_type = query['type'][0]
+
+        service = self.server.service
+        archive_manager = service.archive_manager
+
+        return 'application/json', json.dumps(archive_manager.get_filters(filter_type)).encode('utf-8')
+
     def do_GET(self):
         xbmc.log("KyivstarHttpServer: GET %s" % self.path, xbmc.LOGDEBUG)
 
@@ -152,6 +192,14 @@ class HttpGetHandler(BaseHTTPRequestHandler):
             content_type, content = self.handle_move_channel(url.query)
         elif url.path == '/execute':
             content_type, content = self.handle_execute(url.query)
+        elif url.path == '/get_archive':
+            content_type, content = self.handle_get_archive(url.query)
+        elif url.path == '/get_archive_channels':
+            content_type, content = self.handle_get_archive_channels()
+        elif url.path == '/set_archive_channels':
+            content_type, content = self.handle_set_archive_channels(url.query)
+        elif url.path == '/get_archive_filters':
+            content_type, content = self.handle_get_archive_filters(url.query)
 
         if content:
             if len(content) > 0:

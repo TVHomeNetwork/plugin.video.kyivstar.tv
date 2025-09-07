@@ -405,6 +405,10 @@ msgctxt "#30522"
 msgid "Videos"
 msgstr ""
 
+msgctxt "#30523"
+msgid "Channel archive"
+msgstr ""
+
 msgctxt "#30524"
 msgid "Settings"
 msgstr ""
