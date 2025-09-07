@@ -407,6 +407,9 @@ def show_videos(area):
     limit = int(args.get('limit', [20])[0])
     select = args.get('select', [None])[0]
 
+    sort_name = args.get('sort_name', [''])[0]
+    compilation_name = args.get('compilation_name', [''])[0]
+
     locale = service.addon.getSetting('locale')
     controls = {
         'filters' : { 'en_US' : 'Filters', 'uk_UA' : 'Фільтри', 'ru_RU' : 'Фильтры', 'icon' : '/resources/images/filters.png' },
@@ -420,7 +423,7 @@ def show_videos(area):
         filter_names = []
         for filter_type in filter_types:
             names = [i['displayName'] for i in filter_type['filterElements'] if i['id'] in filters]
-            filter_names.append('%s(%s)' % (filter_type['displayName'], ', '.join(names)))
+            filter_names.append('%s (%s)' % (filter_type['displayName'], ', '.join(names)))
         heading = controls[select][locale]
         index = xbmcgui.Dialog().select(heading, filter_names)
         if index < 0:
@@ -470,6 +473,7 @@ def show_videos(area):
             return
 
         args['compilation'] = compilations[index]['id']
+        args['compilation_name'] = names[index]
         del args['select']
         url = plugin.url_for(show_videos, area=area)
         url += '?{}'.format(urlencode(args, doseq=True))
@@ -485,6 +489,7 @@ def show_videos(area):
             return
 
         args['sort'] = sort_filters[index]['id']
+        args['sort_name'] = names[index]
         del args['select']
         url = plugin.url_for(show_videos, area=area)
         url += '?{}'.format(urlencode(args, doseq=True))
@@ -492,7 +497,14 @@ def show_videos(area):
 
     if offset == 0:
         for key in controls:
-            li = xbmcgui.ListItem(label=controls[key][locale])
+            loc_str = controls[key][locale]
+            if key == 'filters' and len(args['filters']) > 0:
+                loc_str += ' (%s)' % len(args['filters'])
+            elif key == 'compilations' and compilation is not None:
+                loc_str += ' (%s)' % compilation_name
+            elif key == 'sort' and sort is not None:
+                loc_str += ' (%s)' % sort_name
+            li = xbmcgui.ListItem(label=loc_str)
             icon = service.addon.getAddonInfo('path') + controls[key]['icon']
             li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
             args['select'] = key
