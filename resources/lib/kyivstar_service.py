@@ -174,6 +174,7 @@ class KyivstarService:
     def set_session_status(self, status):
         window = xbmcgui.Window(10000)
         window.setProperty("KyivstarService_session_status", status)
+        xbmc.log("KyivstarService: Session status changed to %s" % status, xbmc.LOGDEBUG)
 
     def get_session_status(self):
         window = xbmcgui.Window(10000)
@@ -363,12 +364,14 @@ class KyivstarService:
         self.archive_manager.check_programs(True)
 
         check_session_timer = 0
+        check_session_wait_time = 60
         self.check_session_status()
 
         if self.get_session_status() == KyivstarService.SESSION_INACTIVE:
             loc_str = self.addon.getLocalizedString(30212) # 'Error during session status check. Check your logs for details.'
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
-            check_session_timer = int(time.time())
+            check_session_timer = int(time.time()) + check_session_wait_time
+            check_session_wait_time += 60
 
         if self.get_session_status() != KyivstarService.SESSION_EMPTY:
             if self.m3u_file_path and not xbmcvfs.exists(self.m3u_file_path):
@@ -381,16 +384,20 @@ class KyivstarService:
 
         while not monitor.abortRequested():
             try:
+                if self.get_session_status() == KyivstarService.SESSION_INACTIVE:
+                    if int(time.time()) >= check_session_timer:
+                        self.check_session_status()
+                        check_session_timer = int(time.time()) + check_session_wait_time
+                        if check_session_wait_time < 300:
+                            check_session_wait_time += 60
+                    elif monitor.waitForAbort(check_session_timer - int(time.time())):
+                        break
+                    continue
+
                 if self.save_epg_index >= 0:
                     self.step_save_epg()
                     if self.save_epg_index < 0:
                         self.refreshed = time.localtime()
-
-                if self.get_session_status() == KyivstarService.SESSION_INACTIVE:
-                    if int(time.time()) - check_session_timer > 5 * 60:
-                        if check_session_timer != 0:
-                            self.check_session_status()
-                        check_session_timer = int(time.time())
 
                 if self.save_epg_index < 0:
                     current_time = time.localtime()
