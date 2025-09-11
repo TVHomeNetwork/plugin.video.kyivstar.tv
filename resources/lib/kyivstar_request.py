@@ -13,332 +13,236 @@ class KyivstarRequest:
             'x-vidmind-device-type': 'WEB',
             'x-vidmind-locale': locale,
             }
+        self.error = None
+        self.recoverable = True
+
+    def send(self, url, data=None, json=None, ret=True, ret_json=True):
+        result = None
+        self.error = None
+        self.recoverable = True
+        try:
+            if data is None and json is None:
+                response = requests.get(url, headers=self.headers)
+            elif data:
+                response = requests.post(url, data=data, headers=self.headers)
+            elif json:
+                response = requests.post(url, json=json, headers=self.headers)
+            if ret:
+                result = response.json() if ret_json else response.text
+                if response.status_code != 200:
+                    self.error = 'An unexpected status code of response - %s' % response.status_code
+                    self.recoverable = False
+            else:
+                if response.status_code == 204:
+                    result = True
+                else:
+                    self.error = 'An unexpected status code of response - %s' % response.status_code
+                    self.recoverable = False
+            response.raise_for_status()
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            self.error = str(e)
+        except requests.exceptions.HTTPError as e:
+            self.error = str(e)
+            if e.response.status_code not in [500, 502, 503, 504]:
+                self.recoverable = False
+        except Exception as e:
+            self.error = str(e)
+            self.recoverable = False
+        finally:
+            return result
 
 # Post requests
 
     def login_anonymous(self):
-        profile = {}
-        try:
-            url = self.base_api_url.format('authentication/login')
-            obj_data = {
-                'username':'557455cfe4b04ad886a6ae41\\anonymous',
-                'password':'anonymous'
-                }
-            response = requests.post(url, data=obj_data, headers=self.headers)
-            if response.status_code == 200:
-                profile = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in login_anonymous: " + str(e), xbmc.LOGERROR)
-        finally:
-            return profile
+        url = self.base_api_url.format('authentication/login')
+        obj_data = {
+            'username' : '557455cfe4b04ad886a6ae41\\anonymous',
+            'password' : 'anonymous'
+        }
+        result = self.send(url, data=obj_data)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in login_anonymous: " + self.error, xbmc.LOGERROR)
+            return {}
+        return result
 
     #otp = one time password(sms code)
     def login(self, session_id, username, password=None, otp=None):
-        profile = {}
-        try:
-            obj_data = {'username':'557455cfe4b04ad886a6ae41\\%s' % username}
-            if password:
-                obj_data['password'] = password
-            elif otp:
-                obj_data['otp'] = otp
-            else:
-                return profile
-            url = self.base_api_url.format('authentication/login/v3;jsessionid=%s' % session_id)
-            response = requests.post(url, data=obj_data, headers=self.headers)
-            if response.status_code == 200:
-                profile = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in login: " + str(e), xbmc.LOGERROR)
-        finally:
-            return profile
+        url = self.base_api_url.format('authentication/login/v3;jsessionid=%s' % session_id)
+        obj_data = { 'username' : '557455cfe4b04ad886a6ae41\\%s' % username }
+        if password:
+            obj_data['password'] = password
+        elif otp:
+            obj_data['otp'] = otp
+        else:
+            return {}
+        result = self.send(url, data=obj_data)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in login: " + self.error, xbmc.LOGERROR)
+            return {}
+        return result
 
     def send_auth_otp(self, session_id, phonenumber):
-        result = False
-        try:
-            url = self.base_api_url.format('v2/otp;jsessionid=%s' % session_id)
-            json_data = {
-                'phoneNumber':phonenumber,
-                'language':'UK'
-                }
-            response = requests.post(url, json=json_data, headers=self.headers)
-            if response.status_code == 204:
-                result = True
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in send_auth_otp: " + str(e), xbmc.LOGERROR)
-        finally:
-            return result
+        url = self.base_api_url.format('v2/otp;jsessionid=%s' % session_id)
+        json_data = {
+            'phoneNumber' : phonenumber,
+            'language' : 'UK'
+        }
+        result = self.send(url, json=json_data, ret=False)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in send_auth_otp: " + self.error, xbmc.LOGERROR)
+            return False
+        return result
 
     def get_elem_cur_program_epg_data(self, session_id, elem_id):
-        epg_data = {}
-        try:
-            json_data = {
-                'assetIds':[elem_id]
-                }
-            url = self.base_api_url.format('livechannels/current-programs;jsessionid=%s' % session_id)
-            response = requests.post(url, json=json_data, headers=self.headers)
-            if response.status_code == 200:
-                response_data = response.json()
-                if len(response_data) > 0:
-                    epg_data = response_data[0]
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_elem_cur_program_epg_data: " + str(e), xbmc.LOGERROR)
-        finally:
-            return epg_data
+        url = self.base_api_url.format('livechannels/current-programs;jsessionid=%s' % session_id)
+        json_data = { 'assetIds' : [elem_id] }
+        result = self.send(url, json=json_data)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_elem_cur_program_epg_data: " + self.error, xbmc.LOGERROR)
+            return {}
+        return result[0] if len(result) > 0 else {}
 
     # locale: en_US, uk_UA, ru_RU
     def change_locale(self, session_id, locale):
-        result = False
-        try:
-            url = self.base_api_url.format('subscribers/locale/change;jsessionid=%s' % session_id)
-            json_data = {
-                'locale':locale
-                }
-            response = requests.post(url, json=json_data, headers=self.headers)
-            if response.status_code == 204:
-                result = True
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in change_locale: " + str(e), xbmc.LOGERROR)
-        finally:
-            return result
+        url = self.base_api_url.format('subscribers/locale/change;jsessionid=%s' % session_id)
+        json_data = { 'locale' : locale }
+        result = self.send(url, json=json_data, ret=False)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in change_locale: " + self.error, xbmc.LOGERROR)
+            return False
+        return result
 
     def get_content_area_filters(self, session_id, area_id):
-        result = []
-        try:
-            url = self.base_api_url.format('filters;jsessionid=%s' % session_id)
-            json_data = {
-                'contentAreaId':area_id
-                }
-            response = requests.post(url, json=json_data, headers=self.headers)
-            if response.status_code == 200:
-                result = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_content_area_filters: " + str(e), xbmc.LOGERROR)
-        finally:
-            return result
+        url = self.base_api_url.format('filters;jsessionid=%s' % session_id)
+        json_data = { 'contentAreaId' : area_id }
+        result = self.send(url, json=json_data)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_content_area_filters: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
 
     def get_compilations(self, session_id, area_id):
-        result = []
-        try:
-            url = self.base_api_url.format('compilations;jsessionid=%s' % session_id)
-            json_data = {
-                'contentAreaId':area_id,
-                'compilationGroupType' : 'CRISPS'
-                }
-            response = requests.post(url, json=json_data, headers=self.headers)
-            if response.status_code == 200:
-                result = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_compilations: " + str(e), xbmc.LOGERROR)
-        finally:
-            return result
+        url = self.base_api_url.format('compilations;jsessionid=%s' % session_id)
+        json_data = {
+            'contentAreaId' : area_id,
+            'compilationGroupType' : 'CRISPS'
+        }
+        result = self.send(url, json=json_data)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_compilations: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
 
     def get_content_area_elems(self, session_id, compilation, filters, sort, offset, limit, sort_order=None):
-        result = []
-        try:
-            url = self.base_api_url.format('gallery/filters/content-area;jsessionid=%s' % session_id)
-            json_data = {
-                'compilationElementId' : compilation,
-                'filterElementIds' : filters,
-                'filterSortElementId' : sort,
-                'offset' : offset,
-                'limit' : limit,
-                'sortOrder' : sort_order
-                }
-            response = requests.post(url, json=json_data, headers=self.headers)
-            if response.status_code == 200:
-                result = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_content_area_elems: " + str(e), xbmc.LOGERROR)
-        finally:
-            return result
+        url = self.base_api_url.format('gallery/filters/content-area;jsessionid=%s' % session_id)
+        json_data = {
+            'compilationElementId' : compilation,
+            'filterElementIds' : filters,
+            'filterSortElementId' : sort,
+            'offset' : offset,
+            'limit' : limit,
+            'sortOrder' : sort_order
+        }
+        result = self.send(url, json=json_data)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_content_area_elems: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
 
 # Get requests
 
     def logout(self, session_id):
-        result = False
-        try:
-            url = self.base_api_url.format('authentication/logout;jsessionid=%s?sessionExpired=false' % session_id)
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 204:
-                result = True
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in logout: " + str(e), xbmc.LOGERROR)
-        finally:
-            return result
+        url = self.base_api_url.format('authentication/logout;jsessionid=%s?sessionExpired=false' % session_id)
+        result = self.send(url, ret=False)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in logout: " + self.error, xbmc.LOGERROR)
+            return False
+        return result
 
     def get_profiles(self, session_id):
-        profiles = []
-        try:
-            url = self.base_api_url.format('api/v1/subscribers;jsessionid=%s' % session_id)
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                profiles = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_profiles: " + str(e), xbmc.LOGERROR)
-        finally:
-            return profiles
+        url = self.base_api_url.format('api/v1/subscribers;jsessionid=%s' % session_id)
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_profiles: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
 
     def get_content_areas(self, session_id):
-        areas = []
-        try:
-            url = self.base_api_url.format('contentareas;jsessionid=%s' % session_id)
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                areas = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_content_areas: " + str(e), xbmc.LOGERROR)
-        finally:
-            return areas
+        url = self.base_api_url.format('contentareas;jsessionid=%s' % session_id)
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_content_areas: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
 
     def get_sort_filters(self, session_id):
-        sort_filters = []
-        try:
-            url = self.base_api_url.format('filters/sort-elements;jsessionid=%s' % session_id)
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                sort_filters = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_sort_filters: " + str(e), xbmc.LOGERROR)
-        finally:
-            return sort_filters
+        url = self.base_api_url.format('filters/sort-elements;jsessionid=%s' % session_id)
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_sort_filters: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
 
     def get_live_channels_groups(self, session_id):
-        groups = []
-        try:
-            url = self.base_api_url.format('v1/contentareas/LIVE_CHANNELS;jsessionid=%s?includeRestricted=true&limit=100' % session_id)
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                groups = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_groups: " + str(e), xbmc.LOGERROR)
-        finally:
-            return groups
+        url = self.base_api_url.format('v1/contentareas/LIVE_CHANNELS;jsessionid=%s?includeRestricted=true&limit=100' % session_id)
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_live_channels_groups: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
 
     def get_group_elems(self, session_id, group_id):
-        elements = []
-        try:
-            url = self.base_api_url.format('gallery/contentgroups/%s;jsessionid=%s?offset=0&limit=500' % (group_id, session_id))
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                elements = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_group_elems: " + str(e), xbmc.LOGERROR)
-        finally:
-            return elements
+        url = self.base_api_url.format('gallery/contentgroups/%s;jsessionid=%s?offset=0&limit=500' % (group_id, session_id))
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_group_elems: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
 
     def get_elem_epg_data(self, session_id, elem_id, days_before=3, days_after=3):
-        epg_datas = []
-        try:
-            now_date = datetime.now()
-            next_date = (now_date + timedelta(days=days_after)).strftime('%Y%m%d')
-            prev_date = (now_date - timedelta(days=days_before)).strftime('%Y%m%d')
-            url = self.base_api_url.format('livechannels/%s/epg;jsessionid=%s?from=%s&to=%s' % (elem_id, session_id, prev_date, next_date))
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                epg_datas = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_elem_epg_data: " + str(e), xbmc.LOGERROR)
-        finally:
-            return epg_datas
+        now_date = datetime.now()
+        next_date = (now_date + timedelta(days=days_after)).strftime('%Y%m%d')
+        prev_date = (now_date - timedelta(days=days_before)).strftime('%Y%m%d')
+        url = self.base_api_url.format('livechannels/%s/epg;jsessionid=%s?from=%s&to=%s' % (elem_id, session_id, prev_date, next_date))
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_elem_epg_data: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
 
     def get_elem_stream_url(self, user_id, session_id, elem_id, virtual=False, date=None):
-        result = ''
-        try:
-            play_v = '2'
-            if user_id == 'anonymous':
-                play_v = '4'
-            url = self.base_api_url.format('play/v%s;jsessionid=%s?assetId=%s' % (play_v, session_id, elem_id))
-            if date:
-                url += '&date=%s' % date
-            response = requests.get(url, headers=self.headers)
-            data = response.json()
-            if response.status_code == 200:
-                if 'error' in data:
-                    raise Exception(data['description'])
-                if virtual:
-                    result = data['media'][0]['url']
-                else:
-                    result = data['liveChannelUrl']
-            else:
-                if data and 'error' in data:
-                    raise Exception(data['description'])
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_elem_stream_url: " + str(e), xbmc.LOGERROR)
-        finally:
-            return result
+        url = self.base_api_url.format('play/v%s;jsessionid=%s?assetId=%s' % ('4' if user_id == 'anonymous' else '2', session_id, elem_id))
+        if date:
+            url += '&date=%s' % date
+        result = self.send(url)
+        if result and 'error' in result:
+            xbmc.log("KyivstarRequest exception in get_elem_stream_url: " + result.get('description', 'Unknown error'), xbmc.LOGERROR)
+            return ''
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_elem_stream_url: " + self.error, xbmc.LOGERROR)
+            return ''
+        return result['media'][0]['url'] if virtual else result['liveChannelUrl']
 
     def get_elem_playback_stream_url(self, user_id, session_id, elem_id, date):
-        result = ''
-        try:
-            play_v = '2'
-            if user_id == 'anonymous':
-                play_v = '4'
-            url = self.base_api_url.format('livechannels/v%s/playback;jsessionid=%s?assetId=%s&date=%s' % (play_v, session_id, elem_id, date))
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                result = response.json()['uri']
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_elem_stream_url: " + str(e), xbmc.LOGERROR)
-        finally:
-            return result
+        url = self.base_api_url.format('livechannels/v%s/playback;jsessionid=%s?assetId=%s&date=%s' % ('4' if user_id == 'anonymous' else '2', session_id, elem_id, date))
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_elem_playback_stream_url: " + self.error, xbmc.LOGERROR)
+            return ''
+        return result['uri']
 
     def get_search(self, session_id, query):
-        result = []
-        try:
-            url = self.base_api_url.format('api/v1/search/predictive;jsessionid=%s?q=%s&limit=50&includeLiveChannels=true' % (session_id, query))
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                result = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_search: " + str(e), xbmc.LOGERROR)
-        finally:
-            return result
+        url = self.base_api_url.format('api/v1/search/predictive;jsessionid=%s?q=%s&limit=50&includeLiveChannels=true' % (session_id, query))
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_search: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
 
     def get_asset_info(self, session_id, asset_id):
-        result = []
-        try:
-            url = self.base_api_url.format('assets/v2;jsessionid=%s?movie=%s' % (session_id, asset_id))
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                result = response.json()
-            else:
-                response.raise_for_status()
-        except Exception as e:
-            xbmc.log("KyivstarRequest exception in get_asset_info: " + str(e), xbmc.LOGERROR)
-        finally:
-            return result
+        url = self.base_api_url.format('assets/v2;jsessionid=%s?movie=%s' % (session_id, asset_id))
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_asset_info: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
