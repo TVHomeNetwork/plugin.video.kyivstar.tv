@@ -246,7 +246,7 @@ class ArchiveManager():
         row = cursor.fetchone()
         cursor.close()
 
-        return row['value']
+        return row['value'] if row else ''
 
     def set_program_text(self, program_id, text, is_name, locale):
         conn = self.conn
@@ -327,8 +327,6 @@ class ArchiveManager():
                 if len(genres - record['genres']) > 0:
                     record['genres'] |= genres
                     record['update_external'].add('genres')
-                if record['parse_step'] == 1:
-                    continue
                 duration = int(program.get('duration', 0)) * 60
                 if record['duration'] == 0 and duration != 0:
                     record['duration'] = duration
