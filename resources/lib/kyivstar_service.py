@@ -347,6 +347,7 @@ class KyivstarService:
             time.sleep(1)
             xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":true}}')
 
+        self.archive_manager.check_channels(True)
         self.archive_manager.check_programs(True)
 
         loc_str = self.addon.getLocalizedString(30211) # 'Save EPG completed.'
