@@ -9,6 +9,7 @@ import xbmcvfs
 
 from urllib.parse import quote, parse_qs, urlencode
 from resources.lib.kyivstar_service import KyivstarService
+from resources.lib.common import SessionStatus
 
 service = KyivstarService()
 plugin = routing.Plugin()
@@ -140,7 +141,7 @@ class LoginDialog(xbmcgui.WindowDialog):
 
 @plugin.route('/login')
 def login():
-    if service.get_session_status() != KyivstarService.SESSION_EMPTY:
+    if service.get_session_status() != SessionStatus.EMPTY:
         return
 
     phonenumber = service.addon.getSetting('phonenumber')
@@ -174,7 +175,7 @@ def login():
         service.addon.setSetting('user_id', profile['userId'])
         service.addon.setSetting('session_id', profile['sessionId'])
         service.addon.setSetting('logged', 'true')
-        service.set_session_status(KyivstarService.SESSION_ACTIVE)
+        service.set_session_status(SessionStatus.ACTIVE)
         return
 
     if login_type == 1:
@@ -195,7 +196,7 @@ def login():
         service.addon.setSetting('session_id', profile['sessionId'])
         service.addon.setSetting('phonenumber', phonenumber)
         service.addon.setSetting('logged', 'true')
-        service.set_session_status(KyivstarService.SESSION_ACTIVE)
+        service.set_session_status(SessionStatus.ACTIVE)
     else:
         profile = service.request.login(profile['sessionId'], username, password=password)
 
@@ -209,7 +210,7 @@ def login():
         service.addon.setSetting('username', username)
         service.addon.getSetting('password', password)
         service.addon.setSetting('logged', 'true')
-        service.set_session_status(KyivstarService.SESSION_ACTIVE)
+        service.set_session_status(SessionStatus.ACTIVE)
 
 @plugin.route('/logout')
 def logout():
@@ -227,17 +228,17 @@ def logout():
     if user_id != 'anonymous' and not service.request.logout(session_id):
         loc_str = service.addon.getLocalizedString(30203) # 'Error during logout. Check your logs for details.'
         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
-        service.set_session_status(KyivstarService.SESSION_INACTIVE)
+        service.set_session_status(SessionStatus.INACTIVE)
         return
 
     service.addon.setSetting('logged', 'false')
     service.addon.setSetting('user_id', '')
     service.addon.setSetting('session_id', '')
-    service.set_session_status(KyivstarService.SESSION_EMPTY)
+    service.set_session_status(SessionStatus.EMPTY)
 
 @plugin.route('/play/<videoid>')
 def play(videoid):
-    if service.get_session_status() == KyivstarService.SESSION_EMPTY:
+    if service.get_session_status() == SessionStatus.EMPTY:
         loc_str = service.addon.getLocalizedString(30204) # 'Log in to the plugin'
         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
         xbmcplugin.setResolvedUrl(handle, False, xbmcgui.ListItem())
@@ -783,7 +784,7 @@ def show_channel_manager():
     url = plugin.url_for(send_command, command='download')
     xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
 
-    if service.m3u_file_path:
+    if service.save_manager.m3u_path is not None:
         loc_str = service.addon.getLocalizedString(30505) # 'Load from file'
         li = xbmcgui.ListItem(label=loc_str)
         icon = service.addon.getAddonInfo('path') + '/resources/images/load-from-file.png'
