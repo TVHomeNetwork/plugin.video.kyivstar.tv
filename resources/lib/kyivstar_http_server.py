@@ -158,6 +158,7 @@ class HttpGetHandler(BaseHTTPRequestHandler):
                 archive_manager.enable_channel(channel)
             elif channel.id not in channel_ids and channel.id in activated_channel_ids:
                 archive_manager.disable_channel(channel.id)
+        service.send_loop_event()
 
         return None, ''
 

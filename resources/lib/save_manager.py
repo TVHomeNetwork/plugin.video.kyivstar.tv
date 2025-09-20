@@ -14,13 +14,13 @@ class SaveManager():
         self.m3u_dir = ''
         self.m3u_name = ''
         self.m3u_path = None
-        self.m3u_start_saving = False
 
         self.epg_dir = ''
         self.epg_name = ''
         self.epg_path = None
-        self.epg_start_saving = False
 
+        self.process_m3u_path = None
+        self.process_epg_path = None
         self.epg_channels = []
         self.epg_xml_root = None
 
@@ -52,14 +52,10 @@ class SaveManager():
         self.epg_name = value
         self.update_epg_path()
 
-    def start_saving(self, m3u=True, epg=True, if_not_exists=False):
-        if m3u and self.m3u_path is not None and (not if_not_exists or if_not_exists and not xbmcvfs.exists(self.m3u_path)):
-            self.m3u_start_saving = True
-        if epg and self.epg_path is not None and (not if_not_exists or if_not_exists and not xbmcvfs.exists(self.epg_path)):
-            self.epg_start_saving = True
-
-    def check_m3u(self):
-        return self.m3u_start_saving
+    def check_m3u(self, load = False):
+        if load:
+            self.process_m3u_path = self.m3u_path
+        return load
 
     def process_m3u(self, service):
         xbmc.log("KyivstarService: Saving M3U started.", xbmc.LOGDEBUG)
@@ -74,28 +70,25 @@ class SaveManager():
 
         channel_manager.save(temp)
 
-        xbmcvfs.copy(temp, self.m3u_path)
+        xbmcvfs.copy(temp, self.process_m3u_path)
         xbmcvfs.delete(temp)
 
         xbmc.log("KyivstarService: Saving M3U completed.", xbmc.LOGDEBUG)
-
-        self.m3u_start_saving = False
         return True
 
     def check_refresh_epg(self, refresh_hour):
         if self.check_epg():
-            return
+            return None
 
         if self.epg_path is None:
-            return
+            return None
 
-        if self.epg_refresh_timer and datetime.now() < self.epg_refresh_timer:
-            return
+        if self.epg_refresh_timer:
+            remaining = self.epg_refresh_timer - datetime.now()
+            return max(0, int(remaining.total_seconds()))
 
         if not xbmcvfs.exists(self.epg_path):
-            self.epg_start_saving = True
-            xbmc.log("KyivstarService: epg does not exists, creating new one", xbmc.LOGDEBUG)
-            return
+            return 0
 
         if self.epg_refresh_timer is None:
             st = xbmcvfs.Stat(self.epg_path)
@@ -103,25 +96,24 @@ class SaveManager():
             self.epg_refresh_timer = self.epg_refresh_timer.replace(hour=refresh_hour, minute=0, second=0, microsecond=0)
             self.epg_refresh_timer += timedelta(days=1)
 
-        if datetime.now() < self.epg_refresh_timer:
-            return
+        now = datetime.now()
+        if now < self.epg_refresh_timer:
+            remaining = self.epg_refresh_timer - now
+            return int(remaining.total_seconds())
 
-        self.epg_start_saving = True
-        self.epg_refresh_timer = datetime.now()
+        self.epg_refresh_timer = now
         self.epg_refresh_timer = self.epg_refresh_timer.replace(hour=refresh_hour, minute=0, second=0, microsecond=0)
         self.epg_refresh_timer += timedelta(days=1)
         xbmc.log("KyivstarService: epg updating, next refresh date is %s" % self.epg_refresh_timer.strftime("%Y-%m-%d %H:%M:%S"), xbmc.LOGDEBUG)
+        return 0
 
     def check_epg(self, load = False):
-        if self.epg_start_saving and load:
-            self.epg_start_saving = False
-
-            if len(self.epg_channels) > 0:
-                self.epg_channels = []
-
+        if load:
             xbmc.log("KyivstarService: Saving EPG started.", xbmc.LOGDEBUG)
 
+            self.process_epg_path = self.epg_path
             self.epg_xml_root = etree.Element("tv")
+            self.epg_channels = []
 
             channel_manager = ChannelManager()
             channel_manager.load(self.m3u_path)
@@ -183,7 +175,7 @@ class SaveManager():
 
         epg_list = '<?xml version="1.0" encoding="utf-8"?>\n'.encode("utf-8") + etree.tostring(xml_root, encoding='utf-8')
 
-        f = xbmcvfs.File(self.epg_path, 'w')
+        f = xbmcvfs.File(self.process_epg_path, 'w')
         f.write(epg_list)
         f.close()
 

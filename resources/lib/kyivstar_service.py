@@ -2,6 +2,7 @@ import traceback
 import random
 import re
 import time
+import threading
 import xbmc
 import xbmcaddon
 import xbmcgui
@@ -40,7 +41,7 @@ class KyivstarServiceMonitor(xbmc.Monitor):
         if path_m3u != self.path_m3u or name_m3u != self.name_m3u:
             service.save_manager.set_m3u_dir(path_m3u)
             service.save_manager.set_m3u_name(name_m3u)
-            service.save_manager.start_saving(m3u=True, epg=False, if_not_exists=True)
+            service.send_loop_event(save_m3u=True, if_not_exists=True)
             self.path_m3u = path_m3u
             self.name_m3u = name_m3u
 
@@ -60,7 +61,7 @@ class KyivstarServiceMonitor(xbmc.Monitor):
                 return
             service.save_manager.set_epg_dir(path_epg)
             service.save_manager.set_epg_name(name_epg)
-            service.save_manager.start_saving(m3u=False, epg=True, if_not_exists=True)
+            service.send_loop_event(save_epg=True, if_not_exists=True)
             self.path_epg = path_epg
             self.name_epg = name_epg
 
@@ -90,7 +91,7 @@ class KyivstarServiceMonitor(xbmc.Monitor):
                 service.request.change_locale(session_id, locale)
             service.request.headers['x-vidmind-locale'] = locale
             self.locale = locale
-            service.save_manager.start_saving()
+            service.send_loop_event(save_m3u=True, save_epg=True)
 
         live_stream_server_port = service.addon.getSetting('live_stream_server_port')
         if live_stream_server_port != self.live_stream_server_port:
@@ -111,12 +112,12 @@ class KyivstarServiceMonitor(xbmc.Monitor):
 
         m3u_include_kyivstar_groups = service.addon.getSetting('m3u_include_kyivstar_groups')
         if m3u_include_kyivstar_groups != self.m3u_include_kyivstar_groups:
-            service.save_manager.start_saving(m3u=True, epg=False)
+            service.send_loop_event(save_m3u=True)
             self.m3u_include_kyivstar_groups = m3u_include_kyivstar_groups
 
         m3u_include_favorites_group = service.addon.getSetting('m3u_include_favorites_group')
         if m3u_include_favorites_group != self.m3u_include_favorites_group:
-            service.save_manager.start_saving(m3u=True, epg=False)
+            service.send_loop_event(save_m3u=True)
             self.m3u_include_favorites_group = m3u_include_favorites_group
 
 class KyivstarService:
@@ -140,6 +141,8 @@ class KyivstarService:
         self.save_manager.set_m3u_name(self.addon.getSetting('name_m3u'))
         self.save_manager.set_epg_dir(self.addon.getSetting('path_epg'))
         self.save_manager.set_epg_name(self.addon.getSetting('name_epg'))
+        self.m3u_start_saving = False
+        self.epg_start_saving = False
 
     def set_session_status(self, status):
         window = xbmcgui.Window(10000)
@@ -179,95 +182,112 @@ class KyivstarService:
 
         return channel_manager.enabled
 
-    def check_m3u(self):
-        if not self.save_manager.m3u_start_saving:
-            return False
-
-        loc_str = None
-        if self.get_session_status() == SessionStatus.EMPTY:
-            loc_str = self.addon.getLocalizedString(30204) # 'Log in to the plugin'
-        elif self.save_manager.m3u_path is None:
-            loc_str = self.addon.getLocalizedString(30206) # 'To save M3U list you must set path and name of file in settings.'
-
-        if loc_str is not None:
-            xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
-            self.save_manager.m3u_start_saving = False
-            return False
-
-        return True
-
-    def check_epg(self):
-        if self.save_manager.check_epg():
-            return True
-
-        if not self.save_manager.epg_start_saving:
-            return False
-
-        loc_str = None
-        if self.get_session_status() == SessionStatus.EMPTY:
-            loc_str = self.addon.getLocalizedString(30204) # 'Log in to the plugin'
-        elif self.save_manager.m3u_path is None:
-            loc_str = self.addon.getLocalizedString(30209) # 'M3U list does not exists.'
-        elif not xbmcvfs.exists(self.save_manager.m3u_path):
-            loc_str = self.addon.getLocalizedString(30209) # 'M3U list does not exists.'
-        elif self.save_manager.epg_path is None:
-            loc_str = self.addon.getLocalizedString(30210) # 'To save EPG you must set path and name of file in settings.'
-
-        if loc_str is not None:
-            xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
-            self.save_manager.epg_start_saving = False
-            return False
-
-        return True
-
     def restart_iptv_simple(self):
         xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":false}}')
         time.sleep(1)
         xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":true}}')
 
-    def run(self):
-        monitor = KyivstarServiceMonitor(self)
-        self.channel_manager = ChannelManager()
+    def send_loop_event(self, save_m3u=False, save_epg=False, if_not_exists=False):
+        m3u_path = self.save_manager.m3u_path if save_m3u else None
+        epg_path = self.save_manager.epg_path if save_epg else None
+        with self.save_state_lock:
+            if m3u_path is not None and (not if_not_exists or (if_not_exists and not xbmcvfs.exists(m3u_path))):
+                self.m3u_start_saving = True
+            if epg_path is not None and (not if_not_exists or (if_not_exists and not xbmcvfs.exists(epg_path))):
+                self.epg_start_saving = True
+        self.loop_event.set()
 
-        self.archive_manager = ArchiveManager()
-        uset_data_path = xbmcvfs.translatePath(self.addon.getAddonInfo('profile'))
-        self.archive_manager.open(uset_data_path)
-        self.archive_manager.check_channels(True)
-        self.archive_manager.check_programs(True)
+    def loop(self):
+        m3u_start_saving = False
+        epg_start_saving = False
 
-        check_session_timer = 0
-        check_session_wait_time = 5
+        self.check_session_timer = 0
+        self.check_session_wait_time = 0
         self.check_session_status()
+
+        wait_time = 0
 
         if self.get_session_status() == SessionStatus.INACTIVE:
             loc_str = self.addon.getLocalizedString(30212) # 'Error during session status check. Check your logs for details.'
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
-            check_session_timer = int(time.time()) + check_session_wait_time
-            check_session_wait_time += 5
+            self.check_session_wait_time += 5
+            wait_time = self.check_session_wait_time
+            self.check_session_timer = time.time() + self.check_session_wait_time
 
         if self.get_session_status() != SessionStatus.EMPTY:
-            self.save_manager.start_saving(if_not_exists=True)
+            self.send_loop_event(save_m3u=True, save_epg=True, if_not_exists=True)
 
-        self.live_stream_server = KyivstarHttpServer(self)
-        self.live_stream_server.start()
+        while not self.abort_requested:
+            wait_start = time.time()
+            if self.loop_event.wait(wait_time):
+                wait_time = None
+            elif wait_time is not None:
+                elapsed = time.time() - wait_start
+                wait_time = max(0, wait_time - elapsed)
+            self.loop_event.clear()
 
-        while not monitor.abortRequested():
-            try:
-                if self.get_session_status() == SessionStatus.INACTIVE:
-                    if int(time.time()) >= check_session_timer:
-                        self.check_session_status()
-                        check_session_timer = int(time.time()) + check_session_wait_time
-                        if check_session_wait_time < 300:
-                            check_session_wait_time += 5
-                    elif monitor.waitForAbort(check_session_timer - int(time.time())):
-                        break
-                    continue
+            if self.abort_requested:
+                break
+
+            if self.get_session_status() == SessionStatus.INACTIVE:
+                now = time.time()
+                if now >= self.check_session_timer:
+                    self.check_session_status()
+                    if self.get_session_status() == SessionStatus.INACTIVE:
+                        self.check_session_wait_time = min(300, self.check_session_wait_time + 5)
+                    else:
+                        self.check_session_wait_time = 0
+                    wait_time = self.check_session_wait_time
+                    self.check_session_timer = now + self.check_session_wait_time
                 else:
-                    check_session_wait_time = 5
+                    wait_time = self.check_session_timer - now
+                continue
 
-                self.save_manager.check_refresh_epg(int(self.addon.getSetting('epg_refresh_hour')))
+            with self.save_state_lock:
+                if self.m3u_start_saving:
+                    self.m3u_start_saving = False
+                    m3u_start_saving = True
+                elif self.epg_start_saving:
+                    self.epg_start_saving = False
+                    epg_start_saving = True
 
-                if self.check_m3u() and self.save_manager.check_m3u():
+            refresh_wait_time = self.save_manager.check_refresh_epg(int(self.addon.getSetting('epg_refresh_hour')))
+            if refresh_wait_time is not None:
+                if refresh_wait_time == 0:
+                    epg_start_saving = True
+                elif wait_time is not None and wait_time > 0:
+                    wait_time = min(wait_time, refresh_wait_time)
+                else:
+                    wait_time = refresh_wait_time
+
+            if m3u_start_saving:
+                loc_str = None
+                if self.get_session_status() == SessionStatus.EMPTY:
+                    loc_str = self.addon.getLocalizedString(30204) # 'Log in to the plugin'
+                elif self.save_manager.m3u_path is None:
+                    loc_str = self.addon.getLocalizedString(30206) # 'To save M3U list you must set path and name of file in settings.'
+                if loc_str is not None:
+                    xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
+                    m3u_start_saving = False
+
+            if epg_start_saving:
+                loc_str = None
+                if self.get_session_status() == SessionStatus.EMPTY:
+                    loc_str = self.addon.getLocalizedString(30204) # 'Log in to the plugin'
+                elif self.save_manager.m3u_path is None:
+                    loc_str = self.addon.getLocalizedString(30209) # 'M3U list does not exists.'
+                elif not xbmcvfs.exists(self.save_manager.m3u_path):
+                    loc_str = self.addon.getLocalizedString(30209) # 'M3U list does not exists.'
+                elif self.save_manager.epg_path is None:
+                    loc_str = self.addon.getLocalizedString(30210) # 'To save EPG you must set path and name of file in settings.'
+                if loc_str is not None:
+                    xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
+                    epg_start_saving = False
+
+            try:
+                if self.save_manager.check_m3u(m3u_start_saving):
+                    if m3u_start_saving:
+                        m3u_start_saving = False
                     if self.save_manager.process_m3u(self):
                         if self.addon.getSetting('iptv_sc_reload_when_m3u_saved') == 'true':
                             self.restart_iptv_simple()
@@ -277,7 +297,10 @@ class KyivstarService:
                         loc_str = self.addon.getLocalizedString(30207) # 'Error during list saving. Check your logs for details.'
                         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
                         self.set_session_status(SessionStatus.INACTIVE)
-                elif self.check_epg() and self.save_manager.check_epg(True):
+                    wait_time = 1
+                elif self.save_manager.check_epg(epg_start_saving):
+                    if epg_start_saving:
+                        epg_start_saving = False
                     for _ in range(int(self.addon.getSetting('epg_group_requests_count'))):
                         if self.save_manager.process_epg(self):
                             if self.addon.getSetting('iptv_sc_reload_when_epg_saved') == 'true':
@@ -285,25 +308,45 @@ class KyivstarService:
                             loc_str = self.addon.getLocalizedString(30211) # 'Save EPG completed.'
                             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
                             break
-                elif self.archive_manager.check_channels():
-                    for _ in range(int(self.addon.getSetting('epg_group_requests_count'))):
-                        self.archive_manager.process_channel(self)
-                elif self.archive_manager.check_programs():
-                    for _ in range(int(self.addon.getSetting('epg_group_requests_count'))):
-                        self.archive_manager.process_program(self)
-
-                wait_time = 60
-                if self.save_manager.check_epg() or self.archive_manager.check_programs() or self.archive_manager.check_channels():
                     wait_time = int(self.addon.getSetting('epg_group_requests_delay'))
-                if monitor.waitForAbort(wait_time):
-                    break
-
+                elif self.archive_manager.check_channels():
+                    self.archive_manager.process_channel(self)
+                    wait_time = int(self.addon.getSetting('epg_group_requests_delay'))
+                elif self.archive_manager.check_programs():
+                    self.archive_manager.process_program(self)
+                    wait_time = int(self.addon.getSetting('epg_group_requests_delay'))
             except Exception as e:
                 xbmc.log("KyivstarService exception: %s" % str(e), xbmc.LOGERROR)
                 xbmc.log("KyivstarService call trace: %s" % (traceback.format_exc()), xbmc.LOGERROR)
 
-        self.archive_manager.close()
+    def run(self):
+        self.abort_requested = False
+        self.loop_event = threading.Event()
+        self.save_state_lock = threading.Lock()
+
+        monitor = KyivstarServiceMonitor(self)
+        self.channel_manager = ChannelManager()
+
+        self.archive_manager = ArchiveManager()
+        user_data_path = xbmcvfs.translatePath(self.addon.getAddonInfo('profile'))
+        self.archive_manager.open(user_data_path)
+        self.archive_manager.check_channels(True)
+        self.archive_manager.check_programs(True)
+
+        self.live_stream_server = KyivstarHttpServer(self)
+        self.live_stream_server.start()
+
+        loop_thread = threading.Thread(target=self.loop)
+        loop_thread.start()
+
+        monitor.waitForAbort()
+
+        self.abort_requested = True
+        self.loop_event.set()
+        loop_thread.join()
+
         self.live_stream_server.stop()
+        self.archive_manager.close()
         if self.channel_manager.changed and self.addon.getSetting('autosave_changes_on_exit') == 'true':
             if self.save_manager.m3u_path is None:
                 return
