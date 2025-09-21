@@ -20,105 +20,108 @@ from resources.lib.common import strip_html, SessionStatus
 class KyivstarServiceMonitor(xbmc.Monitor):
     def __init__(self, service):
         xbmc.Monitor.__init__(self)
+
         self.service = service
-        self.path_m3u = service.addon.getSetting('path_m3u')
-        self.name_m3u = service.addon.getSetting('name_m3u')
-        self.path_epg = service.addon.getSetting('path_epg')
-        self.name_epg = service.addon.getSetting('name_epg')
-        self.inputstream = service.addon.getSetting('stream_inputstream')
-        self.locale = service.addon.getSetting('locale')
-        self.live_stream_server_port = service.addon.getSetting('live_stream_server_port')
-        self.live_inputstream = service.addon.getSetting('live_stream_inputstream')
-        self.m3u_include_kyivstar_groups = service.addon.getSetting('m3u_include_kyivstar_groups')
-        self.m3u_include_favorites_group = service.addon.getSetting('m3u_include_favorites_group')
+        self.settings = [
+            { 'name' : ('path_m3u', 'name_m3u'), 'func' : self.set_m3u_path },
+            { 'name' : ('path_epg', 'name_epg'), 'func' : self.set_epg_path },
+            { 'name' : ('stream_inputstream',), 'func' : self.set_inputstream },
+            { 'name' : ('locale',), 'func' : self.set_locale },
+            { 'name' : ('live_stream_server_port',), 'func' : self.set_server_port },
+            { 'name' : ('live_stream_inputstream',), 'func' : self.set_live_inputstream },
+            { 'name' : ('m3u_include_kyivstar_groups',), 'func' : self.set_groups },
+            { 'name' : ('m3u_include_favorites_group',), 'func' : self.set_groups }
+        ]
+        self.cancel_epg_saving = None
+        self.load_setting_values('_value')
+
+    def load_setting_values(self, prop):
+        for setting in self.settings:
+            for name in setting['name']:
+                setting[name + prop] = self.service.addon.getSetting(name)
+
+    def show_cancel_epg_saving(self):
+        if self.cancel_epg_saving is None:
+            loc_str_1 = self.service.addon.getLocalizedString(30114) # 'Warning'
+            loc_str_2 = self.service.addon.getLocalizedString(30115) # 'This will cancel the EPG save process that is not yet complete. Continue?'
+            loc_str_3 = self.service.addon.getLocalizedString(30112) # 'Yes'
+            loc_str_4 = self.service.addon.getLocalizedString(30113) # 'No'
+            self.cancel_epg_saving = xbmcgui.Dialog().yesno(loc_str_1, loc_str_2, yeslabel=loc_str_3, nolabel=loc_str_4)
+        return self.cancel_epg_saving
+
+    def check_setting(self, setting):
+        changed = False
+        for name in setting['name']:
+            if setting[name + '_value'] != setting[name + '_new_value']:
+                changed = True
+                break
+
+        if not changed:
+            return
+
+        if setting['func'](setting):
+            for name in setting['name']:
+                setting[name + '_value'] = setting[name + '_new_value']
+        else:
+            for name in setting['name']:
+                self.service.addon.setSetting(name, setting[name + '_value'])
+
+    def set_m3u_path(self, setting):
+        self.service.save_manager.set_m3u_dir(setting['path_m3u_new_value'])
+        self.service.save_manager.set_m3u_name(setting['name_m3u_new_value'])
+        self.service.send_loop_event(save_m3u=True, if_not_exists=True)
+        return True
+
+    def set_epg_path(self, setting):
+        if self.service.save_manager.check_epg() and not self.show_cancel_epg_saving():
+            return False
+        self.service.save_manager.set_epg_dir(setting['path_epg_new_value'])
+        self.service.save_manager.set_epg_name(setting['name_epg_new_value'])
+        self.service.send_loop_event(save_epg=True, if_not_exists=True)
+        return True
+
+    def check_inputstream(self, inputstream):
+        if inputstream == 'default':
+            return True
+        if xbmc.getCondVisibility('System.HasAddon(%s)' % inputstream) == 0:
+            loc_str = self.service.addon.getLocalizedString(30213) # 'Inputstream addon does not found. Set value to default.'
+            xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
+            return False
+        return True
+
+    def set_inputstream(self, setting):
+        return self.check_inputstream(setting['stream_inputstream_new_value'])
+
+    def set_live_inputstream(self, setting):
+        return self.check_inputstream(setting['live_stream_inputstream_new_value'])
+
+    def set_locale(self, setting):
+        if self.service.save_manager.check_epg() and not self.show_cancel_epg_saving():
+            return False
+        # are we need send request?
+        locale = setting['locale_new_value']
+        session_id = self.service.addon.getSetting('session_id')
+        if self.service.get_session_status() != SessionStatus.EMPTY:
+            self.service.request.change_locale(session_id, locale)
+        self.service.request.headers['x-vidmind-locale'] = locale
+        self.service.send_loop_event(save_m3u=True, save_epg=True)
+        return True
+
+    def set_server_port(self, setting):
+        self.service.live_stream_server.stop()
+        self.service.live_stream_server.start()
+        return True
+
+    def set_groups(self, setting):
+        self.service.send_loop_event(save_m3u=True)
+        return True
 
     def onSettingsChanged(self):
-        service = self.service
-        session_id = service.addon.getSetting('session_id')
+        self.cancel_epg_saving = None
+        self.load_setting_values('_new_value')
 
-        path_m3u = service.addon.getSetting('path_m3u')
-        name_m3u = service.addon.getSetting('name_m3u')
-        if path_m3u != self.path_m3u or name_m3u != self.name_m3u:
-            service.save_manager.set_m3u_dir(path_m3u)
-            service.save_manager.set_m3u_name(name_m3u)
-            service.send_loop_event(save_m3u=True, if_not_exists=True)
-            self.path_m3u = path_m3u
-            self.name_m3u = name_m3u
-
-        cancel_epg_saving = None
-        path_epg = service.addon.getSetting('path_epg')
-        name_epg = service.addon.getSetting('name_epg')
-        if path_epg != self.path_epg or name_epg != self.name_epg:
-            if service.save_manager.check_epg():
-                loc_str_1 = service.addon.getLocalizedString(30114) # 'Warning'
-                loc_str_2 = service.addon.getLocalizedString(30115) # 'This will cancel the EPG save process that is not yet complete. Continue?'
-                loc_str_3 = service.addon.getLocalizedString(30112) # 'Yes'
-                loc_str_4 = service.addon.getLocalizedString(30113) # 'No'
-                cancel_epg_saving = xbmcgui.Dialog().yesno(loc_str_1, loc_str_2, yeslabel=loc_str_3, nolabel=loc_str_4)
-            if cancel_epg_saving == False:
-                service.addon.setSetting('path_epg', self.path_epg)
-                service.addon.setSetting('name_epg', self.name_epg)
-                return
-            service.save_manager.set_epg_dir(path_epg)
-            service.save_manager.set_epg_name(name_epg)
-            service.send_loop_event(save_epg=True, if_not_exists=True)
-            self.path_epg = path_epg
-            self.name_epg = name_epg
-
-        inputstream = service.addon.getSetting('stream_inputstream')
-        if inputstream != self.inputstream:
-            if inputstream != 'default' and xbmc.getCondVisibility('System.HasAddon(%s)' % inputstream) == 0:
-                loc_str = service.addon.getLocalizedString(30213) # 'Inputstream addon does not found. Set value to default.'
-                xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
-                service.addon.setSetting('stream_inputstream', 'default')
-                self.inputstream = 'default'
-            else:
-                self.inputstream = inputstream
-
-        locale = service.addon.getSetting('locale')
-        if locale != self.locale:
-            if service.save_manager.check_epg() and cancel_epg_saving is None:
-                loc_str_1 = service.addon.getLocalizedString(30114) # 'Warning'
-                loc_str_2 = service.addon.getLocalizedString(30115) # 'This will cancel the EPG save process that is not yet complete. Continue?'
-                loc_str_3 = service.addon.getLocalizedString(30112) # 'Yes'
-                loc_str_4 = service.addon.getLocalizedString(30113) # 'No'
-                cancel_epg_saving = xbmcgui.Dialog().yesno(loc_str_1, loc_str_2, yeslabel=loc_str_3, nolabel=loc_str_4)
-            if cancel_epg_saving == False:
-                service.addon.setSetting('locale', self.locale)
-                return
-            # are we need send request?
-            if service.get_session_status() != SessionStatus.EMPTY:
-                service.request.change_locale(session_id, locale)
-            service.request.headers['x-vidmind-locale'] = locale
-            self.locale = locale
-            service.send_loop_event(save_m3u=True, save_epg=True)
-
-        live_stream_server_port = service.addon.getSetting('live_stream_server_port')
-        if live_stream_server_port != self.live_stream_server_port:
-            if service.live_stream_server.httpd.server_address[1] != int(live_stream_server_port):
-                service.live_stream_server.stop()
-                service.live_stream_server.start()
-            self.live_stream_server_port = live_stream_server_port
-
-        live_inputstream = service.addon.getSetting('live_stream_inputstream')
-        if live_inputstream != self.live_inputstream:
-            if inputstream != 'default' and xbmc.getCondVisibility('System.HasAddon(%s)' % inputstream) == 0:
-                loc_str = service.addon.getLocalizedString(30213) # 'Inputstream addon does not found. Set value to default.'
-                xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
-                service.addon.setSetting('live_stream_inputstream', 'default')
-                self.live_inputstream = 'default'
-            else:
-                self.live_inputstream = live_inputstream
-
-        m3u_include_kyivstar_groups = service.addon.getSetting('m3u_include_kyivstar_groups')
-        if m3u_include_kyivstar_groups != self.m3u_include_kyivstar_groups:
-            service.send_loop_event(save_m3u=True)
-            self.m3u_include_kyivstar_groups = m3u_include_kyivstar_groups
-
-        m3u_include_favorites_group = service.addon.getSetting('m3u_include_favorites_group')
-        if m3u_include_favorites_group != self.m3u_include_favorites_group:
-            service.send_loop_event(save_m3u=True)
-            self.m3u_include_favorites_group = m3u_include_favorites_group
+        for setting in self.settings:
+            self.check_setting(setting)
 
 class KyivstarService:
     def __init__(self):
