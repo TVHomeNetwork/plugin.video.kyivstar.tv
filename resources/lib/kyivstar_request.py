@@ -85,7 +85,8 @@ class KyivstarRequest:
         url = self.base_api_url.format('v2/otp;jsessionid=%s' % session_id)
         json_data = {
             'phoneNumber' : phonenumber,
-            'language' : 'UK'
+            'language' : 'UK',
+            'channel' : 'sms'
         }
         result = self.send(url, json=json_data, ret=False)
         if self.error:
