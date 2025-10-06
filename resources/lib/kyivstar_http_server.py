@@ -11,24 +11,20 @@ class HttpGetHandler(BaseHTTPRequestHandler):
     def handle_get_playlist(self, url_query):
         query = parse_qs(url_query)
         asset_id = query['asset'][0]
-        epg = query.get('epg', None)
-        if epg:
-            epg = epg[0]
+        epg = query.get('epg', [None])[0]
+        epg = epg if epg is None else int(epg)
 
-        if hasattr(self.server, 'manager'):
-            delattr(self.server, 'manager')
-
-        self.server.manager = KyivstarStreamManager(self.server, asset_id, epg)
-        return 'application/vnd.apple.mpegurl', self.server.manager.get_playlist_content()
+        content = self.server.stream_manager.get_playlist_content(asset_id, epg)
+        return 'application/vnd.apple.mpegurl', content.encode('utf-8') if content is not None else None
 
     def handle_get_chunklist(self, url_query):
-        live = False
-        strip_length = 4
-        if url_query.startswith('live&'):
-            live = True
-            strip_length += 5
-        stream_url = url_query[strip_length:]
-        return 'application/vnd.apple.mpegurl', self.server.manager.get_chunklist_content(stream_url, live)
+        query = parse_qs(url_query)
+        asset_id = query['asset'][0]
+        epg = query.get('epg', [None])[0]
+        epg = epg if epg is None else int(epg)
+        stream_id = int(query['stream'][0])
+        content = self.server.stream_manager.get_chunklist_content(asset_id, stream_id, epg)
+        return 'application/vnd.apple.mpegurl', content.encode('utf-8') if content is not None else None
 
     def handle_get_channels(self):
         service = self.server.service
@@ -228,6 +224,7 @@ class KyivstarHttpServer(object):
             port = int(self.service.addon.getSetting('live_stream_server_port'))
             self.httpd = HTTPServer(('', port), HttpGetHandler)
             self.httpd.service = self.service
+            self.httpd.stream_manager = KyivstarStreamManager(self.httpd)
             self.server_thread = threading.Thread(target=self.process)
             self.server_thread.start()
             xbmc.log("KyivstarHttpServer: started at 0.0.0.0:%s" % port, xbmc.LOGINFO)
