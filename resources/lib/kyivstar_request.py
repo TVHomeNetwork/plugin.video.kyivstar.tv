@@ -204,8 +204,8 @@ class KyivstarRequest:
             return []
         return result
 
-    def get_elem_epg_data(self, session_id, elem_id, days_before=3, days_after=3):
-        now_date = datetime.now()
+    def get_elem_epg_data(self, session_id, elem_id, date=None, days_before=3, days_after=3):
+        now_date = datetime.now() if date is None else date
         next_date = (now_date + timedelta(days=days_after)).strftime('%Y%m%d')
         prev_date = (now_date - timedelta(days=days_before)).strftime('%Y%m%d')
         url = self.base_api_url.format('livechannels/%s/epg;jsessionid=%s?from=%s&to=%s' % (elem_id, session_id, prev_date, next_date))
