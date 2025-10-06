@@ -15,11 +15,13 @@ class KyivstarRequest:
             }
         self.error = None
         self.recoverable = True
+        self.url = None
 
     def send(self, url, data=None, json=None, ret=True, ret_json=True):
         result = None
         self.error = None
         self.recoverable = True
+        self.url = url
         try:
             if data is None and json is None:
                 response = requests.get(url, headers=self.headers)
@@ -38,6 +40,8 @@ class KyivstarRequest:
                 else:
                     self.error = 'An unexpected status code of response - %s' % response.status_code
                     self.recoverable = False
+            if len(response.history) > 0:
+                self.url = response.history[0].headers['Location']
             response.raise_for_status()
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             self.error = str(e)
