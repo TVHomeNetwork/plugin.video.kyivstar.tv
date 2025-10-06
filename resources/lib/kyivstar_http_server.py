@@ -200,7 +200,7 @@ class HttpGetHandler(BaseHTTPRequestHandler):
         elif url.path == '/get_archive_filters':
             content_type, content = self.handle_get_archive_filters(url.query)
 
-        if content:
+        if content is not None:
             if len(content) > 0:
                 self.send_response(200)
                 self.send_header('Content-type', content_type)
