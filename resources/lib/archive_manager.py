@@ -6,7 +6,7 @@ import sqlite3
 
 import xbmc
 
-from resources.lib.common import strip_html
+from resources.lib.common import strip_html, SessionStatus
 
 class ArchiveManager():
     def __init__(self):
@@ -136,9 +136,19 @@ class ArchiveManager():
             return
 
         session_id = service.addon.getSetting('session_id')
-        channel_id = self.channel_ids.pop(0)
+        channel_id = self.channel_ids[0]
 
         result = service.request.get_elem_epg_data(session_id, channel_id)
+        if service.request.error:
+            if service.request.recoverable:
+                service.set_session_status(SessionStatus.INACTIVE)
+                return
+            else:
+                xbmc.log("KyivstarArchive process_channel: error occurred while downloading asset %s epg data." % (channel_id), xbmc.LOGERROR)
+                del self.channel_ids[0]
+                return
+
+        del self.channel_ids[0]
         if len(result) == 0:
             return
 
@@ -390,9 +400,19 @@ class ArchiveManager():
         locale = service.addon.getSetting('locale')
 
         session_id = service.addon.getSetting('session_id')
-        program_id = self.program_ids.pop(0)
+        program_id = self.program_ids[0]
 
         result = service.request.get_asset_info(session_id, program_id)
+        if service.request.error:
+            if service.request.recoverable:
+                service.set_session_status(SessionStatus.INACTIVE)
+                return
+            else:
+                xbmc.log("KyivstarArchive process_program: error occurred while downloading asset %s data." % (program_id), xbmc.LOGERROR)
+                del self.program_ids[0]
+                return
+
+        del self.program_ids[0]
         if len(result) == 0:
             return
 
