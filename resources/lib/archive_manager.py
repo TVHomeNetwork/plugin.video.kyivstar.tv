@@ -585,6 +585,15 @@ class ArchiveManager():
 
         return elements
 
+    def vacuum(self):
+        conn = self.conn
+        if conn is None:
+            return
+
+        cursor = conn.cursor()
+        cursor.execute("VACUUM")
+        cursor.close()
+
     def close(self):
         conn = self.conn
         if conn:

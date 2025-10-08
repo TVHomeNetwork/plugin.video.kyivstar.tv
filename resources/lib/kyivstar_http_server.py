@@ -149,11 +149,14 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 
         channels = service.get_enabled_channels()
         activated_channel_ids = set(archive_manager.get_channels())
+        is_need_vacuum = False
         for channel in channels:
             if channel.id in channel_ids and channel.id not in activated_channel_ids:
                 archive_manager.enable_channel(channel)
             elif channel.id not in channel_ids and channel.id in activated_channel_ids:
                 archive_manager.disable_channel(channel.id)
+                is_need_vacuum = True
+        if is_need_vacuum: archive_manager.vacuum()
         service.send_loop_event()
 
         return None, ''
