@@ -100,6 +100,8 @@ class ArchiveManager():
             return
 
         cursor = conn.cursor()
+        cursor.execute("DELETE FROM program_texts WHERE program_id IN (SELECT program_id FROM programs WHERE channel_id = (SELECT channel_id FROM channels WHERE asset_id = ?))", (channel_id,))
+        cursor.execute("DELETE FROM program_genres WHERE program_id IN (SELECT program_id FROM programs WHERE channel_id = (SELECT channel_id FROM channels WHERE asset_id = ?))", (channel_id,))
         cursor.execute("DELETE FROM programs WHERE channel_id = (SELECT channel_id FROM channels WHERE asset_id = ?)", (channel_id,))
         cursor.execute("DELETE FROM channels WHERE asset_id = ?", (channel_id,))
         conn.commit()
