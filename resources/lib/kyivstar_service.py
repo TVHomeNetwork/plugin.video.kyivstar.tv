@@ -28,7 +28,6 @@ class KyivstarServiceMonitor(xbmc.Monitor):
             { 'name' : ('stream_inputstream',), 'func' : self.set_inputstream },
             { 'name' : ('locale',), 'func' : self.set_locale },
             { 'name' : ('live_stream_server_port',), 'func' : self.set_server_port },
-            { 'name' : ('live_stream_inputstream',), 'func' : self.set_live_inputstream },
             { 'name' : ('m3u_include_kyivstar_groups',), 'func' : self.set_groups },
             { 'name' : ('m3u_include_favorites_group',), 'func' : self.set_groups }
         ]
@@ -91,9 +90,6 @@ class KyivstarServiceMonitor(xbmc.Monitor):
 
     def set_inputstream(self, setting):
         return self.check_inputstream(setting['stream_inputstream_new_value'])
-
-    def set_live_inputstream(self, setting):
-        return self.check_inputstream(setting['live_stream_inputstream_new_value'])
 
     def set_locale(self, setting):
         if self.service.save_manager.check_epg() and not self.show_cancel_epg_saving():

@@ -264,7 +264,6 @@ def play(videoid):
     if epg == 'null':
         if virtual:
             if service.addon.getSetting('live_stream_server_enabled') == 'true':
-                inputstream = service.addon.getSetting('live_stream_inputstream')
                 port = int(service.addon.getSetting('live_stream_server_port'))
                 url = 'http://127.0.0.1:%s/playlist.m3u8?asset=%s' % (port, videoid)
             else:
