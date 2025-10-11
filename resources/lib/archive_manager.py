@@ -3,11 +3,24 @@ import os
 import datetime
 import time
 import sqlite3
+import re
 import threading
 
 import xbmc
 
 from resources.lib.common import strip_html, SessionStatus
+
+def natural_collation_func(a, b):
+    ka = [int(text) if text.isdigit() else text.lower()
+            for text in re.split(r'(\d+)', a)]
+    kb = [int(text) if text.isdigit() else text.lower()
+            for text in re.split(r'(\d+)', b)]
+    if ka < kb:
+        return -1
+    elif ka > kb:
+        return 1
+    else:
+        return 0
 
 class ArchiveManager():
     def __init__(self):
@@ -20,6 +33,7 @@ class ArchiveManager():
     def open(self, path):
         with self.lock:
             self.conn = sqlite3.connect(os.path.join(path, 'archive.db'), check_same_thread=False)
+            self.conn.create_collation('SIMPLE_NATURAL', natural_collation_func)
             self.conn.row_factory = sqlite3.Row
             cursor = self.conn.cursor()
             cursor.execute('''
@@ -600,7 +614,10 @@ class ArchiveManager():
                     params.append(max_duration)
             query += " (" + " OR ".join(duration_clauses) + ")"
 
-        query += " ORDER BY %s %s" % (sort, 'ASC' if sort_order == 'asc' else 'DESC')
+        query += " ORDER BY %s" % sort
+        if sort == 't2.value': # sort == 'name'
+            query += " COLLATE SIMPLE_NATURAL"
+        query += " ASC" if sort_order == 'asc' else " DESC"
 
         query += " LIMIT ? OFFSET ?"
         params.append(limit)
