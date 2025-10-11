@@ -142,6 +142,7 @@ class KyivstarService:
         self.save_manager.set_epg_name(self.addon.getSetting('name_epg'))
         self.m3u_start_saving = False
         self.epg_start_saving = False
+        self.archive_channels = None
 
     def set_session_status(self, status):
         window = xbmcgui.Window(10000)
@@ -186,7 +187,7 @@ class KyivstarService:
         time.sleep(1)
         xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":true}}')
 
-    def send_loop_event(self, save_m3u=False, save_epg=False, if_not_exists=False):
+    def send_loop_event(self, save_m3u=False, save_epg=False, if_not_exists=False, set_archive_channels=None):
         m3u_path = self.save_manager.m3u_path if save_m3u else None
         epg_path = self.save_manager.epg_path if save_epg else None
         with self.save_state_lock:
@@ -194,11 +195,14 @@ class KyivstarService:
                 self.m3u_start_saving = True
             if epg_path is not None and (not if_not_exists or (if_not_exists and not xbmcvfs.exists(epg_path))):
                 self.epg_start_saving = True
+            if set_archive_channels is not None:
+                self.archive_channels = set_archive_channels
         self.loop_event.set()
 
     def loop(self):
         m3u_start_saving = False
         epg_start_saving = False
+        archive_channels = None
 
         self.check_session_timer = 0
         self.check_session_wait_time = 0
@@ -249,6 +253,9 @@ class KyivstarService:
                 elif self.epg_start_saving:
                     self.epg_start_saving = False
                     epg_start_saving = True
+                if self.archive_channels is not None:
+                    archive_channels = self.archive_channels
+                    self.archive_channels = None
 
             refresh_wait_time = self.save_manager.check_refresh_epg(int(self.addon.getSetting('epg_refresh_hour')))
             if refresh_wait_time is not None:
@@ -282,6 +289,22 @@ class KyivstarService:
                 if loc_str is not None:
                     xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
                     epg_start_saving = False
+
+            if archive_channels is not None:
+                channels = self.get_enabled_channels()
+                activated_channel_ids = set(self.archive_manager.get_channels())
+                channel_ids = set(archive_channels)
+                archive_channels = None
+
+                is_need_vacuum = False
+                for channel in channels:
+                    if channel.id in channel_ids and channel.id not in activated_channel_ids:
+                        self.archive_manager.enable_channel(channel)
+                    elif channel.id not in channel_ids and channel.id in activated_channel_ids:
+                        self.archive_manager.disable_channel(channel.id)
+                        is_need_vacuum = True
+                self.archive_manager.check_channels(True)
+                if is_need_vacuum: self.archive_manager.vacuum()
 
             try:
                 if self.save_manager.check_m3u(m3u_start_saving):

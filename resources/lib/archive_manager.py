@@ -92,8 +92,6 @@ class ArchiveManager():
         conn.commit()
         cursor.close()
 
-        self.check_channels(True)
-
     def disable_channel(self, channel_id):
         conn = self.conn
         if conn is None:
@@ -106,8 +104,6 @@ class ArchiveManager():
         cursor.execute("DELETE FROM channels WHERE asset_id = ?", (channel_id,))
         conn.commit()
         cursor.close()
-
-        self.check_programs(True)
 
     def get_channels(self, update_date_offset=None):
         conn = self.conn
