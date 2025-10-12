@@ -296,15 +296,17 @@ class KyivstarService:
                 channel_ids = set(archive_channels)
                 archive_channels = None
 
-                is_need_vacuum = False
+                has_disabled = False
                 for channel in channels:
                     if channel.id in channel_ids and channel.id not in activated_channel_ids:
                         self.archive_manager.enable_channel(channel)
                     elif channel.id not in channel_ids and channel.id in activated_channel_ids:
                         self.archive_manager.disable_channel(channel.id)
-                        is_need_vacuum = True
+                        has_disabled = True
                 self.archive_manager.check_channels(True)
-                if is_need_vacuum: self.archive_manager.vacuum()
+                if has_disabled:
+                    self.archive_manager.check_programs(True)
+                    self.archive_manager.vacuum()
 
             try:
                 if self.save_manager.check_m3u(m3u_start_saving):
