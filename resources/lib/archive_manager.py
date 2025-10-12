@@ -208,7 +208,6 @@ class ArchiveManager():
             if row is None:
                 cursor.execute("INSERT INTO images (url) VALUES (?)", (url,))
                 index = cursor.lastrowid
-                conn.commit()
             else:
                 index = row['image_id']
             cursor.close()
@@ -244,12 +243,10 @@ class ArchiveManager():
                     if row is None:
                         cursor.execute("INSERT INTO genres (name) VALUES (?)", (genre,))
                         genre_index = cursor.lastrowid
-                        conn.commit()
                     else:
                         genre_index = row['genre_id']
                     self.cached_genres[genre] = genre_index
                 cursor.execute("INSERT OR IGNORE INTO program_genres (program_id, genre_id) VALUES ((SELECT program_id FROM programs WHERE asset_id = ?), ?)", (program_id, genre_index))
-            conn.commit()
             cursor.close()
 
     def parse_program_genres(self, asset_info):
@@ -293,11 +290,9 @@ class ArchiveManager():
             if row is None:
                 cursor.execute("INSERT INTO texts (value) VALUES (?)", (text,))
                 text_index = cursor.lastrowid
-                conn.commit()
             else:
                 text_index = row['text_id']
             cursor.execute("INSERT OR REPLACE INTO program_texts (program_id, locale, is_name, text_id) VALUES ((SELECT program_id FROM programs WHERE asset_id = ?), ?, ?, ?)", (program_id, locale, 1 if is_name else 0, text_index))
-            conn.commit()
             cursor.close()
 
     def update_programs(self, channel, epg_data):
@@ -398,14 +393,11 @@ class ArchiveManager():
                     self.set_program_text(record['asset_id'], record['name'], True, record['locale'])
                 if 'plot' in record['update_external']:
                     self.set_program_text(record['asset_id'], record['plot'], False, record['locale'])
-            conn.commit()
 
             dt = datetime.datetime.now() - datetime.timedelta(days=3)
             dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
             timestamp = time.mktime(dt.timetuple())
             cursor.execute("DELETE FROM programs WHERE start < ?", (timestamp,))
-            conn.commit()
-
             cursor.execute("UPDATE channels SET updateDate = CAST(strftime('%s','now') AS INTEGER) WHERE asset_id = ?", (channel.id,))
             conn.commit()
 
