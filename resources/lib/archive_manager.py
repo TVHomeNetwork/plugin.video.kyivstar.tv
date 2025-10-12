@@ -295,6 +295,13 @@ class ArchiveManager():
             cursor.execute("INSERT OR REPLACE INTO program_texts (program_id, locale, is_name, text_id) VALUES ((SELECT program_id FROM programs WHERE asset_id = ?), ?, ?, ?)", (program_id, locale, 1 if is_name else 0, text_index))
             cursor.close()
 
+    def get_program_name(self, channel, program):
+        if channel.type == 'VIRTUAL':
+            return program.get('title', '')
+
+        timestamp = int(program.get('start', 0))/1000
+        return datetime.datetime.fromtimestamp(timestamp).strftime('%d %B %H:%M ') + program.get('title', '')
+
     def update_programs(self, channel, epg_data):
         conn = self.conn
         if conn is None:
@@ -336,7 +343,7 @@ class ArchiveManager():
                             'insert': True,
                             'update': set(['asset_id', 'channel_id', 'start', 'parse_step', 'release_date', 'duration', 'image_id']),
                             'locale': locale,
-                            'name': program.get('title', ''),
+                            'name': self.get_program_name(channel, program),
                             'plot': strip_html(program.get('desc', '')),
                             'genres': self.parse_program_genres(program),
                             'update_external': set(['genres', 'name', 'plot']),
@@ -367,7 +374,7 @@ class ArchiveManager():
                 if record['duration'] == 0 and duration != 0:
                     record['duration'] = duration
                     record['update'].add('duration')
-                title = program.get('title', '')
+                title = self.get_program_name(channel, program)
                 if record['name'] == '' and title != '':
                     record['name'] = title
                     record['update_external'].add('name')
