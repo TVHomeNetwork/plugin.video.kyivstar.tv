@@ -27,6 +27,7 @@ class ArchiveManager():
         self.program_ids = None
         self.channel_ids = None
         self.cached_genres = {}
+        self.cached_text_filters = []
 
     def open(self, path):
         with self.lock:
@@ -516,6 +517,8 @@ class ArchiveManager():
                 filters = ['0-30', '30-60', '60-90', '90-120', '120-150', '150-180', '180-0']
             elif filter_type == 'channel':
                 filters = self.get_channels()
+            elif filter_type == 'text':
+                filters = self.cached_text_filters
             else:
                 filters = []
             cursor.close()
@@ -550,15 +553,14 @@ class ArchiveManager():
             query += " JOIN texts AS t2 ON t1.text_id = t2.text_id"
             sort = 't2.value'
 
-        if len(filters) > 0:
-            query += " WHERE "
-
         xbmc.log("KyivstarArchive: get elements with filters %s" % ', '.join(filters), xbmc.LOGDEBUG)
 
         channel_filters = []
         genre_filters = []
         year_filters = []
         duration_filters = []
+        text_filters = []
+        reset_text_filters = False
         for filter in filters:
             filter = filter.split(':')
             filter_type = filter[0]
@@ -571,6 +573,20 @@ class ArchiveManager():
                 year_filters.append(int(filter))
             elif filter_type == 'duration':
                 duration_filters.append(filter)
+            elif filter_type == 'text':
+                if filter == 'reset_filters':
+                    reset_text_filters = True
+                    continue
+                text_filters.append(filter)
+                if filter not in self.cached_text_filters:
+                    self.cached_text_filters.append(filter)
+
+        if reset_text_filters:
+            text_filters = []
+            self.cached_text_filters = []
+
+        if len(channel_filters) + len(genre_filters) + len(year_filters) + len(duration_filters) + len(text_filters) > 0:
+            query += " WHERE "
 
         no_filter = len(params)
 
@@ -609,6 +625,15 @@ class ArchiveManager():
                     params.append(min_duration)
                     params.append(max_duration)
             query += " (" + " OR ".join(duration_clauses) + ")"
+
+        if len(text_filters) > 0:
+            if len(params) != no_filter:
+                query += " AND "
+            text_clauses = []
+            for text_filter in text_filters:
+                text_clauses.append("programs.program_id IN (SELECT program_id FROM program_texts WHERE text_id IN (SELECT text_id FROM texts WHERE value LIKE ?))")
+                params.append(f'%{text_filter}%')
+            query += " (" + " AND ".join(text_clauses) + ")"
 
         query += " ORDER BY %s" % sort
         if sort == 't2.value': # sort == 'name'

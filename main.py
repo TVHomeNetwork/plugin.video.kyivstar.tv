@@ -571,6 +571,7 @@ def show_archive():
         }
 
     filter_types = {
+        'text' : { 'en_US' : 'Text', 'uk_UA' : 'Текст', 'ru_RU' : 'Текст' },
         'genre' : { 'en_US' : 'Genre', 'uk_UA' : 'Жанр', 'ru_RU' : 'Жанр' },
         'year' : { 'en_US' : 'Year', 'uk_UA' : 'Рік', 'ru_RU' : 'Год' },
         'duration' : { 'en_US' : 'Duration', 'uk_UA' : 'Тривалість', 'ru_RU' : 'Продолжительность' },
@@ -613,10 +614,17 @@ def show_archive():
         heading = filter_types[filter_type][locale]
         preselect = []
         names = []
+        if filter_type == 'text':
+            add_text_filter = { 'en_US' : 'Add text filter', 'uk_UA' : 'Додати текстовий фільтр', 'ru_RU' : 'Добавить текстовый фильтр' }
+            names.append(add_text_filter[locale])
+            reset_text_filter = { 'en_US' : 'Reset text filters', 'uk_UA' : 'Скинути текстові фільтри', 'ru_RU' : 'Сбросить текстовые фильтры' }
+            names.append(reset_text_filter[locale])
+            if 'text:reset_filters' in filters:
+                preselect.append(1)
         if filter_type == 'channel':
             channels = service.get_enabled_channels()
             channels = {channel.id: channel.name for channel in channels}
-        for index, elem in enumerate(elems):
+        for elem in elems:
             if filter_type == 'channel':
                 names.append(channels[elem])
             elif filter_type == 'year':
@@ -624,12 +632,24 @@ def show_archive():
             else:
                 names.append(elem)
             if f'{filter_type}:{elem}' in filters:
-                preselect.append(index)
+                preselect.append(len(names) - 1)
         indexes = xbmcgui.Dialog().multiselect(heading, names, 0, preselect)
         if indexes is None:
             return
         if indexes == preselect:
             return
+
+        if filter_type == 'text':
+            if 0 in indexes:
+                text = xbmcgui.Dialog().input(heading)
+                if text != '':
+                    args['filters'].append(f'text:{text}')
+            if 1 in indexes:
+                args['filters'].append('text:reset_filters')
+                indexes = []
+            elif 1 in preselect:
+                args['filters'].remove('text:reset_filters')
+            indexes = [i - 2 for i in indexes if i > 1]
 
         for index, elem in enumerate(elems):
             filter_elem = f'{filter_type}:{elem}'
