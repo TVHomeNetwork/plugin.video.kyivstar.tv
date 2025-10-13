@@ -1,13 +1,11 @@
-import json
 import os
-import datetime
-import time
 import sqlite3
 import re
 import threading
 
 import xbmc
 
+from datetime import datetime, timedelta, timezone
 from resources.lib.common import strip_html, SessionStatus
 
 def natural_collation_func(a, b):
@@ -300,7 +298,7 @@ class ArchiveManager():
             return program.get('title', '')
 
         timestamp = int(program.get('start', 0))/1000
-        return datetime.datetime.fromtimestamp(timestamp).strftime('%d %B %H:%M ') + program.get('title', '')
+        return datetime.fromtimestamp(timestamp).strftime('%d %B %H:%M ') + program.get('title', '')
 
     def update_programs(self, channel, epg_data):
         conn = self.conn
@@ -401,9 +399,8 @@ class ArchiveManager():
                 if 'plot' in record['update_external']:
                     self.set_program_text(record['asset_id'], record['plot'], False, record['locale'])
 
-            dt = datetime.datetime.now() - datetime.timedelta(days=3)
-            dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
-            timestamp = time.mktime(dt.timetuple())
+            dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=3)
+            timestamp = int(dt.timestamp() * 1000)
             cursor.execute("DELETE FROM programs WHERE start < ?", (timestamp,))
             cursor.execute("UPDATE channels SET updateDate = CAST(strftime('%s','now') AS INTEGER) WHERE asset_id = ?", (channel.id,))
             conn.commit()
