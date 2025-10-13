@@ -3,6 +3,7 @@ import random
 import re
 import time
 import threading
+import uuid
 import xbmc
 import xbmcaddon
 import xbmcgui
@@ -124,12 +125,8 @@ class KyivstarService:
         self.addon = xbmcaddon.Addon()
 
         device_id = self.addon.getSetting('device_id')
-        if device_id == '':
-            device_id = '10000000-1000-4000-8000-100000000000'
-            def num_rep(match):
-                return random.choice('0123456789abcdef')
-            device_id = re.sub(r'[018]', num_rep, device_id)
-            self.addon.setSetting('device_id', device_id)
+        if not device_id:
+            self.addon.setSetting('device_id', str(uuid.uuid4()))
 
         locale = self.addon.getSetting('locale')
 
