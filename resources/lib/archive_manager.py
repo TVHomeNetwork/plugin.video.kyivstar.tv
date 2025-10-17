@@ -58,9 +58,9 @@ class ArchiveManager():
                     start INTEGER,
                     parse_step INTEGER,
                     release_date INTEGER,
-                    duration INTERGER,
+                    duration INTEGER,
                     image_id INTEGER,
-                    FOREIGN KEY (channel_id) REFERENCES channels (channel_id)
+                    FOREIGN KEY (channel_id) REFERENCES channels (channel_id),
                     FOREIGN KEY (image_id) REFERENCES images (image_id)
                 )
             ''')
@@ -206,12 +206,12 @@ class ArchiveManager():
 
             if row is None:
                 cursor.execute("INSERT INTO images (url) VALUES (?)", (url,))
-                index = cursor.lastrowid
+                image_index = cursor.lastrowid
             else:
-                index = row['image_id']
+                image_index = row['image_id']
             cursor.close()
 
-        return index
+        return image_index
 
     def get_program_genres(self, program_id):
         conn = self.conn
@@ -481,9 +481,9 @@ class ArchiveManager():
                 season = { 'en_US' : 'season', 'uk_UA' : 'сезон', 'ru_RU' : 'сезон' }
                 season_number = program.get('seasonNumber', 0)
                 episode = { 'en_US' : 'episode', 'uk_UA' : 'серія', 'ru_RU' : 'серия' }
-                episod_number = program.get('episodeNumber', 0)
-                if series_name != '' and season_number != 0 and episod_number != 0:
-                    name = '%s, %s %s, %s %s' % (series_name, season[locale], season_number, episode[locale], episod_number)
+                episode_number = program.get('episodeNumber', 0)
+                if series_name != '' and season_number != 0 and episode_number != 0:
+                    name = '%s, %s %s, %s %s' % (series_name, season[locale], season_number, episode[locale], episode_number)
             if name != '':
                 record['name'] = name
                 self.set_program_text(record['asset_id'], record['name'], True, locale)
