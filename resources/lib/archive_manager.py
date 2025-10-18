@@ -116,10 +116,12 @@ class ArchiveManager():
 
         with self.lock:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM program_texts WHERE program_id IN (SELECT program_id FROM programs WHERE channel_id = (SELECT channel_id FROM channels WHERE asset_id = ?))", (channel_id,))
-            cursor.execute("DELETE FROM program_genres WHERE program_id IN (SELECT program_id FROM programs WHERE channel_id = (SELECT channel_id FROM channels WHERE asset_id = ?))", (channel_id,))
-            cursor.execute("DELETE FROM programs WHERE channel_id = (SELECT channel_id FROM channels WHERE asset_id = ?)", (channel_id,))
-            cursor.execute("DELETE FROM channels WHERE asset_id = ?", (channel_id,))
+            cursor.execute("CREATE TEMP TABLE tmp_ids AS SELECT p.program_id FROM programs AS p JOIN channels AS c ON p.channel_id = c.channel_id WHERE c.asset_id = ?;", (channel_id,))
+            cursor.execute("DELETE FROM program_texts WHERE program_id IN (SELECT program_id FROM tmp_ids);")
+            cursor.execute("DELETE FROM program_genres WHERE program_id IN (SELECT program_id FROM tmp_ids);")
+            cursor.execute("DELETE FROM programs WHERE program_id in (SELECT program_id FROM tmp_ids);")
+            cursor.execute("DELETE FROM channels WHERE asset_id = ?;", (channel_id,))
+            cursor.execute("DROP TABLE tmp_ids;")
             conn.commit()
             cursor.close()
 
@@ -131,7 +133,8 @@ class ArchiveManager():
         with self.lock:
             cursor = conn.cursor()
             if update_date_offset is not None:
-                cursor.execute("SELECT asset_id FROM channels WHERE (updateDate + ?) < CAST(strftime('%s','now') AS INTEGER)", (update_date_offset,))
+                dt = datetime.now() - timedelta(seconds=update_date_offset)
+                cursor.execute("SELECT asset_id FROM channels WHERE updateDate < ?", (dt.timestamp(),))
             else:
                 cursor.execute("SELECT asset_id FROM channels")
             rows = cursor.fetchall()
@@ -205,7 +208,7 @@ class ArchiveManager():
             row = cursor.fetchone()
 
             if row is None:
-                cursor.execute("INSERT INTO images (url) VALUES (?)", (url,))
+                cursor.execute("INSERT INTO images (url) VALUES (?);", (url,))
                 image_index = cursor.lastrowid
             else:
                 image_index = row['image_id']
@@ -220,7 +223,7 @@ class ArchiveManager():
 
         with self.lock:
             cursor = conn.cursor()
-            cursor.execute("SELECT name FROM genres WHERE genre_id IN (SELECT genre_id FROM program_genres WHERE program_id = (SELECT program_id FROM programs WHERE asset_id = ?))", (program_id,))
+            cursor.execute("SELECT g.name FROM genres AS g JOIN program_genres AS pg ON g.genre_id = pg.genre_id JOIN programs AS p ON pg.program_id = p.program_id WHERE p.asset_id = ?", (program_id,))
             rows = cursor.fetchall()
             genres = [row['name'] for row in rows]
             cursor.close()
@@ -240,12 +243,12 @@ class ArchiveManager():
                     cursor.execute("SELECT genre_id FROM genres WHERE name = ?", (genre,))
                     row = cursor.fetchone()
                     if row is None:
-                        cursor.execute("INSERT INTO genres (name) VALUES (?)", (genre,))
+                        cursor.execute("INSERT INTO genres (name) VALUES (?);", (genre,))
                         genre_index = cursor.lastrowid
                     else:
                         genre_index = row['genre_id']
                     self.cached_genres[genre] = genre_index
-                cursor.execute("INSERT OR IGNORE INTO program_genres (program_id, genre_id) VALUES ((SELECT program_id FROM programs WHERE asset_id = ?), ?)", (program_id, genre_index))
+                cursor.execute("INSERT OR IGNORE INTO program_genres (program_id, genre_id) VALUES ((SELECT program_id FROM programs WHERE asset_id = ?), ?);", (program_id, genre_index))
             cursor.close()
 
     def parse_program_genres(self, asset_info):
@@ -271,7 +274,7 @@ class ArchiveManager():
 
         with self.lock:
             cursor = conn.cursor()
-            cursor.execute("SELECT value FROM texts WHERE text_id IN (SELECT text_id FROM program_texts WHERE program_id = (SELECT program_id FROM programs WHERE asset_id = ?) AND is_name = ? AND locale = ?)", (program_id, 1 if is_name else 0, locale))
+            cursor.execute("SELECT t.value FROM texts AS t JOIN program_texts AS pt ON t.text_id = pt.text_id JOIN programs AS p ON pt.program_id = p.program_id WHERE p.asset_id = ? AND pt.is_name = ? AND pt.locale = ?", (program_id, 1 if is_name else 0, locale))
             row = cursor.fetchone()
             cursor.close()
 
@@ -287,11 +290,11 @@ class ArchiveManager():
             cursor.execute("SELECT text_id FROM texts WHERE value = ?", (text,))
             row = cursor.fetchone()
             if row is None:
-                cursor.execute("INSERT INTO texts (value) VALUES (?)", (text,))
+                cursor.execute("INSERT INTO texts (value) VALUES (?);", (text,))
                 text_index = cursor.lastrowid
             else:
                 text_index = row['text_id']
-            cursor.execute("INSERT OR REPLACE INTO program_texts (program_id, locale, is_name, text_id) VALUES ((SELECT program_id FROM programs WHERE asset_id = ?), ?, ?, ?)", (program_id, locale, 1 if is_name else 0, text_index))
+            cursor.execute("INSERT OR REPLACE INTO program_texts (program_id, locale, is_name, text_id) VALUES ((SELECT program_id FROM programs WHERE asset_id = ?), ?, ?, ?);", (program_id, locale, 1 if is_name else 0, text_index))
             cursor.close()
 
     def get_program_name(self, channel, program):
@@ -387,11 +390,11 @@ class ArchiveManager():
             for record in data.values():
                 if record['insert']:
                     updates = list(record['update'])
-                    cursor.execute("INSERT INTO programs (%s) VALUES (%s)" % (', '.join(updates), ', '.join(['?'] * len(updates))),
+                    cursor.execute("INSERT INTO programs (%s) VALUES (%s);" % (', '.join(updates), ', '.join(['?'] * len(updates))),
                                    tuple([record[field] for field in record['update']]))
                 elif len(record['update']) > 0:
                     updates = ["%s = ?" % field for field in record['update']]
-                    cursor.execute("UPDATE programs SET %s WHERE asset_id = ?" % ', '.join(updates),
+                    cursor.execute("UPDATE programs SET %s WHERE asset_id = ?;" % ', '.join(updates),
                                    tuple([record[field] for field in record['update']]) + (record['asset_id'],))
                 if 'genres' in record['update_external']:
                     self.set_program_genres(record['asset_id'], record['genres'])
@@ -403,7 +406,8 @@ class ArchiveManager():
             dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=3)
             timestamp = int(dt.timestamp() * 1000)
             cursor.execute("DELETE FROM programs WHERE start < ?", (timestamp,))
-            cursor.execute("UPDATE channels SET updateDate = CAST(strftime('%s','now') AS INTEGER) WHERE asset_id = ?", (channel.id,))
+            dt = datetime.now()
+            cursor.execute("UPDATE channels SET updateDate = ? WHERE asset_id = ?", (dt.timestamp(), channel.id,))
             conn.commit()
 
             cursor.close()
@@ -415,7 +419,7 @@ class ArchiveManager():
         if load and conn:
             with self.lock:
                 cursor = conn.cursor()
-                cursor.execute("SELECT asset_id FROM programs WHERE parse_step = 0 AND (SELECT type FROM channels WHERE channels.channel_id = programs.channel_id) = 'VIRTUAL'")
+                cursor.execute("SELECT p.asset_id FROM programs AS p JOIN channels AS c ON p.channel_id = c.channel_id WHERE p.parse_step = 0 AND c.type = 'VIRTUAL'")
                 rows = cursor.fetchall()
                 self.program_ids = [row['asset_id'] for row in rows]
                 cursor.close()
@@ -472,7 +476,7 @@ class ArchiveManager():
                 record['update'].add('image_id')
             if len(record['update']) > 0:
                 updates = ["%s = ?" % field for field in record['update']]
-                cursor.execute("UPDATE programs SET %s WHERE asset_id = ?" % ', '.join(updates),
+                cursor.execute("UPDATE programs SET %s WHERE asset_id = ?;" % ', '.join(updates),
                                tuple([record[field] for field in record['update']]) + (record['asset_id'],))
 
             name = program.get('name', '')
@@ -506,7 +510,7 @@ class ArchiveManager():
         with self.lock:
             cursor = conn.cursor()
             if filter_type == 'genre':
-                cursor.execute("SELECT name FROM genres ORDER BY name")
+                cursor.execute("SELECT DISTINCT g.name FROM program_genres AS pg LEFT JOIN genres AS g ON pg.genre_id = g.genre_id ORDER BY g.name")
                 rows = cursor.fetchall()
                 filters = [row['name'] for row in rows]
             elif filter_type == 'year':
@@ -541,17 +545,35 @@ class ArchiveManager():
         limit = int(args.get('limit', [20])[0])
         select = args.get('select', [None])[0]
 
-        query = "SELECT * FROM programs"
-        params = []
+        query = """
+            SELECT
+                p.asset_id AS program_asset_id,
+                c.asset_id AS channel_asset_id,
+                p.start,
+                c.type,
+                i.url AS image,
+                t_name.value AS name,
+                t_plot.value AS plot,
+                p.duration,
+                p.release_date
+            FROM programs AS p
+            JOIN channels AS c
+                ON p.channel_id = c.channel_id
+            JOIN images AS i
+                ON p.image_id = i.image_id
+            LEFT JOIN program_texts as pt_name
+                ON p.program_id = pt_name.program_id AND pt_name.is_name = 1 AND pt_name.locale = ?
+            LEFT JOIN texts AS t_name
+                ON pt_name.text_id = t_name.text_id
+            LEFT JOIN program_texts as pt_plot
+                ON p.program_id = pt_plot.program_id AND pt_plot.is_name = 0 AND pt_plot.locale = ?
+            LEFT JOIN texts AS t_plot
+                ON pt_plot.text_id = t_plot.text_id
+        """
+        params = [ locale, locale ]
 
         if sort not in ['name', 'release_date', 'duration', 'channel_id']:
             sort = 'name'
-
-        if sort == 'name':
-            query += " JOIN program_texts AS t1 ON programs.program_id = t1.program_id AND t1.is_name = 1 AND t1.locale = ?"
-            params.append(locale)
-            query += " JOIN texts AS t2 ON t1.text_id = t2.text_id"
-            sort = 't2.value'
 
         xbmc.log("KyivstarArchive: get elements with filters %s" % ', '.join(filters), xbmc.LOGDEBUG)
 
@@ -586,29 +608,29 @@ class ArchiveManager():
             self.cached_text_filters = []
 
         if len(channel_filters) + len(genre_filters) + len(year_filters) + len(duration_filters) + len(text_filters) > 0:
-            query += " WHERE "
+            query += " WHERE"
 
         no_filter = len(params)
 
         if len(channel_filters) > 0:
-            query += " channel_id IN (SELECT channel_id FROM channels WHERE asset_id IN (%s))" % ','.join(['?'] * len(channel_filters))
+            query += " channel_asset_id IN (%s)" % ', '.join(['?'] * len(channel_filters))
             params.extend(channel_filters)
 
         if len(genre_filters) > 0:
             if len(params) != no_filter:
-                query += " AND "
-            query += " programs.program_id IN (SELECT program_id FROM program_genres WHERE genre_id IN (SELECT genre_id FROM genres WHERE name IN (%s)))" % ','.join(['?'] * len(genre_filters))
+                query += " AND"
+            query += " p.program_id IN (SELECT pg.program_id FROM program_genres AS pg JOIN genres AS g ON pg.genre_id = g.genre_id WHERE g.name IN (%s))" % ','.join(['?'] * len(genre_filters))
             params.extend(genre_filters)
 
         if len(year_filters) > 0:
             if len(params) != no_filter:
-                query += " AND "
-            query += " release_date IN (%s)" % ','.join(['?'] * len(year_filters))
+                query += " AND"
+            query += " release_date IN (%s)" % ', '.join(['?'] * len(year_filters))
             params.extend(year_filters)
 
         if len(duration_filters) > 0:
             if len(params) != no_filter:
-                query += " AND "
+                query += " AND"
             duration_clauses = []
             for duration_filter in duration_filters:
                 duration_filter = duration_filter.split('-')
@@ -628,15 +650,14 @@ class ArchiveManager():
 
         if len(text_filters) > 0:
             if len(params) != no_filter:
-                query += " AND "
-            text_clauses = []
+                query += " AND"
+            query += " (" + " AND ".join(["(name LIKE ? OR plot LIKE ?)"] * len(text_filters)) + ")"
             for text_filter in text_filters:
-                text_clauses.append("programs.program_id IN (SELECT program_id FROM program_texts WHERE text_id IN (SELECT text_id FROM texts WHERE value LIKE ?))")
                 params.append(f'%{text_filter}%')
-            query += " (" + " AND ".join(text_clauses) + ")"
+                params.append(f'%{text_filter}%')
 
         query += " ORDER BY %s" % sort
-        if sort == 't2.value': # sort == 'name'
+        if sort == 'name':
             query += " COLLATE SIMPLE_NATURAL"
         query += " ASC" if sort_order == 'asc' else " DESC"
 
@@ -652,14 +673,9 @@ class ArchiveManager():
             elements = cursor.fetchall()
             for i, element in enumerate(elements):
                 element = dict(element)
-                row = cursor.execute("SELECT * FROM channels WHERE channel_id = ?", (element['channel_id'],)).fetchone()
-                element['videoid'] = '%s-%s|%s' % (row['asset_id'], row['type'], int(element['start']/1000))
-                element['image'] = self.get_program_image(element['image_id'])
-                element['name'] = self.get_program_text(element['asset_id'], True, locale)
-                element['plot'] = self.get_program_text(element['asset_id'], False, locale)
-                element['genres'] = self.get_program_genres(element['asset_id'])
+                element['videoid'] = '%s-%s|%s' % (element['channel_asset_id'], element['type'], int(element['start']/1000))
+                element['genres'] = self.get_program_genres(element['program_asset_id'])
                 elements[i] = element
-
             cursor.close()
 
         return elements
