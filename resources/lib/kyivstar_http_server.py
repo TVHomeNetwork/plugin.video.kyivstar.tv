@@ -158,6 +158,12 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 
         return 'application/json', json.dumps(archive_manager.get_filters(filter_type)).encode('utf-8')
 
+    def handle_reset_archive(self):
+        service = self.server.service
+        service.send_loop_event(reset_archive=True)
+
+        return None, ''
+
     def do_GET(self):
         xbmc.log("KyivstarHttpServer: GET %s" % self.path, xbmc.LOGDEBUG)
 
@@ -186,6 +192,8 @@ class HttpGetHandler(BaseHTTPRequestHandler):
             content_type, content = self.handle_set_archive_channels(url.query)
         elif url.path == '/get_archive_filters':
             content_type, content = self.handle_get_archive_filters(url.query)
+        elif url.path == '/reset_archive':
+            content_type, content = self.handle_reset_archive()
 
         if content is not None:
             if len(content) > 0:

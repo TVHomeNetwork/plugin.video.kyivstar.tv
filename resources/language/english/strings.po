@@ -129,6 +129,14 @@ msgctxt "#30028"
 msgid "Add a description to the programs"
 msgstr ""
 
+msgctxt "#30041"
+msgid "Archive manager options"
+msgstr ""
+
+msgctxt "#30042"
+msgid "Reset archive database"
+msgstr ""
+
 # Stream category
 msgctxt "#30021"
 msgid "Stream"
@@ -252,6 +260,14 @@ msgstr ""
 
 msgctxt "#30118"
 msgid "It will remove chosen groups from all channels. Continue?"
+msgstr ""
+
+msgctxt "#30119"
+msgid "Resetting the archive database"
+msgstr ""
+
+msgctxt "#30120"
+msgid "Are you sure you want to reset the archive database?"
 msgstr ""
 
 # Notifications

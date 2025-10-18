@@ -214,6 +214,13 @@
                     <control type="toggle" />
                 </setting>
             </group>
+            <group id="group_11" label="30041">
+                <setting id="reset_archive" type="action" label="30042" help="-1">
+                    <level>0</level>
+                    <data>RunPlugin(plugin://plugin.video.kyivstar.tv/reset_archive)</data>
+                    <control type="button" format="action" />
+                </setting>
+            </group>
         </category>
         <category id="stream" label="30021">
             <group id="group_7" label="30022">

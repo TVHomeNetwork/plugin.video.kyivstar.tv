@@ -768,6 +768,20 @@ def show_archive():
     xbmcplugin.setContent(handle, 'videos')
     xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
 
+@plugin.route('/reset_archive')
+def reset_archive():
+    loc_str_1 = service.addon.getLocalizedString(30119) # 'Resetting the archive database'
+    loc_str_2 = service.addon.getLocalizedString(30120) # 'Are you sure you want to reset the archive database?'
+    loc_str_3 = service.addon.getLocalizedString(30112) # 'Yes'
+    loc_str_4 = service.addon.getLocalizedString(30113) # 'No'
+    result = xbmcgui.Dialog().yesno(loc_str_1, loc_str_2, yeslabel=loc_str_3, nolabel=loc_str_4)
+    if not result:
+        return
+
+    port = service.addon.getSetting('live_stream_server_port')
+    url = 'http://127.0.0.1:%s/reset_archive' % port
+    requests.get(url)
+
 @plugin.route('/channel_manager')
 def show_channel_manager():
     port = service.addon.getSetting('live_stream_server_port')

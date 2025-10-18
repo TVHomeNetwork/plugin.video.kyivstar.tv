@@ -23,6 +23,7 @@ def natural_collation_func(a, b):
 class ArchiveManager():
     def __init__(self):
         self.conn = None
+        self.path = None
         self.lock = threading.RLock()
         self.program_ids = None
         self.channel_ids = None
@@ -31,6 +32,7 @@ class ArchiveManager():
 
     def open(self, path):
         with self.lock:
+            self.path = path
             self.conn = sqlite3.connect(os.path.join(path, 'archive.db'), check_same_thread=False)
             self.conn.create_collation('SIMPLE_NATURAL', natural_collation_func)
             self.conn.row_factory = sqlite3.Row
@@ -695,3 +697,23 @@ class ArchiveManager():
         if conn is not None:
             with self.lock:
                 conn.close()
+
+    def reset(self):
+        conn = self.conn
+        if conn is None:
+            return
+
+        with self.lock:
+            cursor = conn.cursor()
+            cursor.execute("DROP TABLE IF EXISTS channels;")
+            cursor.execute("DROP TABLE IF EXISTS images;")
+            cursor.execute("DROP TABLE IF EXISTS programs;")
+            cursor.execute("DROP TABLE IF EXISTS texts;")
+            cursor.execute("DROP TABLE IF EXISTS program_texts;")
+            cursor.execute("DROP TABLE IF EXISTS genres;")
+            cursor.execute("DROP TABLE IF EXISTS program_genres;")
+            conn.commit()
+            cursor.close()
+            self.vacuum()
+            self.close()
+            self.open(self.path)

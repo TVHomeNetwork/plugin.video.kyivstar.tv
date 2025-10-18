@@ -140,6 +140,7 @@ class KyivstarService:
         self.m3u_start_saving = False
         self.epg_start_saving = False
         self.archive_channels = None
+        self.reset_archive = False
 
     def set_session_status(self, status):
         window = xbmcgui.Window(10000)
@@ -184,7 +185,7 @@ class KyivstarService:
         time.sleep(1)
         xbmc.executeJSONRPC('{"jsonrpc":"2.0","id":1,"method":"Addons.SetAddonEnabled","params":{"addonid":"pvr.iptvsimple","enabled":true}}')
 
-    def send_loop_event(self, save_m3u=False, save_epg=False, if_not_exists=False, set_archive_channels=None):
+    def send_loop_event(self, save_m3u=False, save_epg=False, if_not_exists=False, set_archive_channels=None, reset_archive=False):
         m3u_path = self.save_manager.m3u_path if save_m3u else None
         epg_path = self.save_manager.epg_path if save_epg else None
         with self.save_state_lock:
@@ -194,6 +195,8 @@ class KyivstarService:
                 self.epg_start_saving = True
             if set_archive_channels is not None:
                 self.archive_channels = set_archive_channels
+            if reset_archive:
+                self.reset_archive = reset_archive
         self.loop_event.set()
 
     def loop(self):
@@ -253,6 +256,9 @@ class KyivstarService:
                 if self.archive_channels is not None:
                     archive_channels = self.archive_channels
                     self.archive_channels = None
+                if self.reset_archive:
+                    self.reset_archive = False
+                    self.archive_manager.reset()
 
             refresh_wait_time = self.save_manager.check_refresh_epg(int(self.addon.getSetting('epg_refresh_hour')))
             if refresh_wait_time is not None:
