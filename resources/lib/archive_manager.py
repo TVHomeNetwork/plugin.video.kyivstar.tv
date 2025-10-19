@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, timezone
 from resources.lib.common import strip_html, SessionStatus
 
 def natural_collation_func(a, b):
+    a = a or ''
+    b = b or ''
     ka = [int(text) if text.isdigit() else text.lower()
             for text in re.split(r'(\d+)', a)]
     kb = [int(text) if text.isdigit() else text.lower()
