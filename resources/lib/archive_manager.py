@@ -269,7 +269,7 @@ class ArchiveManager():
         else:
             return set()
 
-        return set(genres)
+        return set([genre for genre in genres if genre != ''])
 
     def get_program_text(self, program_id, is_name, locale='uk_UA'):
         conn = self.conn
