@@ -99,6 +99,12 @@ class ArchiveManager():
                     FOREIGN KEY (genre_id) REFERENCES genres (genre_id)
                 )
             ''')
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_programs_parse_step ON programs(parse_step);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_programs_start ON programs(start);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_programs_channel_id ON programs(channel_id);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_program_genres_genre_id ON program_genres(genre_id, program_id);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_program_genres_program_id ON program_genres(program_id);")
+            cursor.execute("ANALYZE;")
             self.conn.commit()
             cursor.close()
 
