@@ -553,6 +553,7 @@ class ArchiveManager():
             SELECT
                 p.asset_id AS program_asset_id,
                 c.asset_id AS channel_asset_id,
+                p.channel_id,
                 p.start,
                 c.type,
                 i.url AS image,
