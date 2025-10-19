@@ -614,30 +614,20 @@ class ArchiveManager():
             text_filters = []
             self.cached_text_filters = []
 
-        if len(channel_filters) + len(genre_filters) + len(year_filters) + len(duration_filters) + len(text_filters) > 0:
-            query += " WHERE"
-
-        no_filter = len(params)
-
+        filter_clauses = []
         if len(channel_filters) > 0:
-            query += " channel_asset_id IN (%s)" % ', '.join(['?'] * len(channel_filters))
+            filter_clauses.append("channel_asset_id IN (%s)" % ', '.join(['?'] * len(channel_filters)))
             params.extend(channel_filters)
 
         if len(genre_filters) > 0:
-            if len(params) != no_filter:
-                query += " AND"
-            query += " p.program_id IN (SELECT pg.program_id FROM program_genres AS pg JOIN genres AS g ON pg.genre_id = g.genre_id WHERE g.name IN (%s))" % ','.join(['?'] * len(genre_filters))
+            filter_clauses.append("p.program_id IN (SELECT pg.program_id FROM program_genres AS pg JOIN genres AS g ON pg.genre_id = g.genre_id WHERE g.name IN (%s))" % ','.join(['?'] * len(genre_filters)))
             params.extend(genre_filters)
 
         if len(year_filters) > 0:
-            if len(params) != no_filter:
-                query += " AND"
-            query += " release_date IN (%s)" % ', '.join(['?'] * len(year_filters))
+            filter_clauses.append("release_date IN (%s)" % ', '.join(['?'] * len(year_filters)))
             params.extend(year_filters)
 
         if len(duration_filters) > 0:
-            if len(params) != no_filter:
-                query += " AND"
             duration_clauses = []
             for duration_filter in duration_filters:
                 duration_filter = duration_filter.split('-')
@@ -653,15 +643,16 @@ class ArchiveManager():
                     duration_clauses.append("(duration >= ? AND duration <= ?)")
                     params.append(min_duration)
                     params.append(max_duration)
-            query += " (" + " OR ".join(duration_clauses) + ")"
+            filter_clauses.append("(" + " OR ".join(duration_clauses) + ")")
 
         if len(text_filters) > 0:
-            if len(params) != no_filter:
-                query += " AND"
-            query += " (" + " AND ".join(["(name LIKE ? OR plot LIKE ?)"] * len(text_filters)) + ")"
+            filter_clauses.append("(" + " AND ".join(["(name LIKE ? OR plot LIKE ?)"] * len(text_filters)) + ")")
             for text_filter in text_filters:
                 params.append(f'%{text_filter}%')
                 params.append(f'%{text_filter}%')
+
+        if len(filter_clauses) > 0:
+            query += " WHERE " + " AND ".join(filter_clauses)
 
         query += " ORDER BY %s" % sort
         if sort == 'name':
