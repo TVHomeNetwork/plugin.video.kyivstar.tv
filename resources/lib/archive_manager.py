@@ -120,7 +120,12 @@ class ArchiveManager():
 
         with self.lock:
             cursor = conn.cursor()
-            cursor.execute("CREATE TEMP TABLE tmp_ids AS SELECT p.program_id FROM programs AS p JOIN channels AS c ON p.channel_id = c.channel_id WHERE c.asset_id = ?;", (channel_id,))
+            cursor.execute(
+                "CREATE TEMP TABLE tmp_ids AS SELECT p.program_id FROM programs AS p "
+                "JOIN channels AS c ON p.channel_id = c.channel_id "
+                "WHERE c.asset_id = ?;",
+                (channel_id,)
+            )
             cursor.execute("DELETE FROM program_texts WHERE program_id IN (SELECT program_id FROM tmp_ids);")
             cursor.execute("DELETE FROM program_genres WHERE program_id IN (SELECT program_id FROM tmp_ids);")
             cursor.execute("DELETE FROM programs WHERE program_id in (SELECT program_id FROM tmp_ids);")
@@ -227,7 +232,13 @@ class ArchiveManager():
 
         with self.lock:
             cursor = conn.cursor()
-            cursor.execute("SELECT g.name FROM genres AS g JOIN program_genres AS pg ON g.genre_id = pg.genre_id JOIN programs AS p ON pg.program_id = p.program_id WHERE p.asset_id = ?", (program_id,))
+            cursor.execute(
+                "SELECT g.name FROM genres AS g "
+                "JOIN program_genres AS pg ON g.genre_id = pg.genre_id "
+                "JOIN programs AS p ON pg.program_id = p.program_id "
+                "WHERE p.asset_id = ?",
+                (program_id,)
+            )
             rows = cursor.fetchall()
             genres = [row['name'] for row in rows]
             cursor.close()
@@ -252,7 +263,12 @@ class ArchiveManager():
                     else:
                         genre_index = row['genre_id']
                     self.cached_genres[genre] = genre_index
-                cursor.execute("INSERT OR IGNORE INTO program_genres (program_id, genre_id) VALUES ((SELECT program_id FROM programs WHERE asset_id = ?), ?);", (program_id, genre_index))
+                cursor.execute(
+                    "INSERT OR IGNORE INTO program_genres "
+                    "(program_id, genre_id) VALUES "
+                    "((SELECT program_id FROM programs WHERE asset_id = ?), ?);",
+                    (program_id, genre_index)
+                )
             cursor.close()
 
     def parse_program_genres(self, asset_info):
@@ -278,7 +294,13 @@ class ArchiveManager():
 
         with self.lock:
             cursor = conn.cursor()
-            cursor.execute("SELECT t.value FROM texts AS t JOIN program_texts AS pt ON t.text_id = pt.text_id JOIN programs AS p ON pt.program_id = p.program_id WHERE p.asset_id = ? AND pt.is_name = ? AND pt.locale = ?", (program_id, 1 if is_name else 0, locale))
+            cursor.execute(
+                "SELECT t.value FROM texts AS t "
+                "JOIN program_texts AS pt ON t.text_id = pt.text_id "
+                "JOIN programs AS p ON pt.program_id = p.program_id "
+                "WHERE p.asset_id = ? AND pt.is_name = ? AND pt.locale = ?",
+                (program_id, 1 if is_name else 0, locale)
+            )
             row = cursor.fetchone()
             cursor.close()
 
@@ -298,7 +320,12 @@ class ArchiveManager():
                 text_index = cursor.lastrowid
             else:
                 text_index = row['text_id']
-            cursor.execute("INSERT OR REPLACE INTO program_texts (program_id, locale, is_name, text_id) VALUES ((SELECT program_id FROM programs WHERE asset_id = ?), ?, ?, ?);", (program_id, locale, 1 if is_name else 0, text_index))
+            cursor.execute(
+                "INSERT OR REPLACE INTO program_texts "
+                "(program_id, locale, is_name, text_id) VALUES "
+                "((SELECT program_id FROM programs WHERE asset_id = ?), ?, ?, ?);",
+                (program_id, locale, 1 if is_name else 0, text_index)
+            )
             cursor.close()
 
     def get_program_name(self, channel, program):
@@ -424,7 +451,11 @@ class ArchiveManager():
         if load and conn:
             with self.lock:
                 cursor = conn.cursor()
-                cursor.execute("SELECT p.asset_id FROM programs AS p JOIN channels AS c ON p.channel_id = c.channel_id WHERE p.parse_step = 0 AND c.type = 'VIRTUAL'")
+                cursor.execute(
+                    "SELECT p.asset_id FROM programs AS p "
+                    "JOIN channels AS c ON p.channel_id = c.channel_id "
+                    "WHERE p.parse_step = 0 AND c.type = 'VIRTUAL'"
+                )
                 rows = cursor.fetchall()
                 self.program_ids = [row['asset_id'] for row in rows]
                 cursor.close()
@@ -516,11 +547,19 @@ class ArchiveManager():
         with self.lock:
             cursor = conn.cursor()
             if filter_type == 'genre':
-                cursor.execute("SELECT DISTINCT g.name FROM program_genres AS pg LEFT JOIN genres AS g ON pg.genre_id = g.genre_id ORDER BY g.name")
+                cursor.execute(
+                    "SELECT DISTINCT g.name FROM program_genres AS pg "
+                    "LEFT JOIN genres AS g ON pg.genre_id = g.genre_id "
+                    "ORDER BY g.name"
+                )
                 rows = cursor.fetchall()
                 filters = [row['name'] for row in rows]
             elif filter_type == 'year':
-                cursor.execute("SELECT DISTINCT release_date FROM programs WHERE release_date > 0 ORDER BY release_date DESC")
+                cursor.execute(
+                    "SELECT DISTINCT release_date FROM programs "
+                    "WHERE release_date > 0 "
+                    "ORDER BY release_date DESC"
+                )
                 rows = cursor.fetchall()
                 filters = [row['release_date'] for row in rows]
             elif filter_type == 'duration':
@@ -620,7 +659,12 @@ class ArchiveManager():
             params.extend(channel_filters)
 
         if len(genre_filters) > 0:
-            filter_clauses.append("p.program_id IN (SELECT pg.program_id FROM program_genres AS pg JOIN genres AS g ON pg.genre_id = g.genre_id WHERE g.name IN (%s))" % ','.join(['?'] * len(genre_filters)))
+            filter_clauses.append(
+                "p.program_id IN "
+                "(SELECT pg.program_id FROM program_genres AS pg "
+                "JOIN genres AS g ON pg.genre_id = g.genre_id "
+                "WHERE g.name IN (%s))" % ','.join(['?'] * len(genre_filters))
+            )
             params.extend(genre_filters)
 
         if len(year_filters) > 0:
