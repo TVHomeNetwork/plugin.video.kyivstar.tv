@@ -393,11 +393,12 @@ class ArchiveManager():
                 if record['insert']:
                     updates = list(record['update'])
                     cursor.execute("INSERT INTO programs (%s) VALUES (%s);" % (', '.join(updates), ', '.join(['?'] * len(updates))),
-                                   tuple([record[field] for field in record['update']]))
+                                   tuple([record[field] for field in updates]))
                 elif len(record['update']) > 0:
-                    updates = ["%s = ?" % field for field in record['update']]
-                    cursor.execute("UPDATE programs SET %s WHERE asset_id = ?;" % ', '.join(updates),
-                                   tuple([record[field] for field in record['update']]) + (record['asset_id'],))
+                    updates = list(record['update'])
+                    clauses = ["%s = ?" % field for field in updates]
+                    cursor.execute("UPDATE programs SET %s WHERE asset_id = ?;" % ', '.join(clauses),
+                                   tuple([record[field] for field in updates]) + (record['asset_id'],))
                 if 'genres' in record['update_external']:
                     self.set_program_genres(record['asset_id'], record['genres'])
                 if 'name' in record['update_external']:
@@ -477,9 +478,10 @@ class ArchiveManager():
                 record['image_id'] = self.set_program_image(image)
                 record['update'].add('image_id')
             if len(record['update']) > 0:
-                updates = ["%s = ?" % field for field in record['update']]
-                cursor.execute("UPDATE programs SET %s WHERE asset_id = ?;" % ', '.join(updates),
-                               tuple([record[field] for field in record['update']]) + (record['asset_id'],))
+                updates = list(record['update'])
+                clauses = ["%s = ?" % field for field in updates]
+                cursor.execute("UPDATE programs SET %s WHERE asset_id = ?;" % ', '.join(clauses),
+                               tuple([record[field] for field in updates]) + (record['asset_id'],))
 
             name = program.get('name', '')
             if program.get('assetType', '') == 'EPISODE':
