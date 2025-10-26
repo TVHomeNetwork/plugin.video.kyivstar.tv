@@ -133,23 +133,22 @@ class SaveManager():
         xml_root = self.epg_xml_root
 
         if len(channels) > 0:
-            channel = channels[0]
+            channel = channels.pop(0)
             epg_data = service.request.get_elem_epg_data(session_id, channel.id)
 
             if service.request.error:
                 if service.request.recoverable:
                     xbmc.log("KyivstarService step_save_epg: recoverable error occurred while downloading asset %s(%s) epg data." % (channel.id, channel.name), xbmc.LOGDEBUG)
                     service.set_session_status(SessionStatus.INACTIVE)
-                    return False
+                    channels.append(channel)
+                    return
                 else:
                     xbmc.log("KyivstarService step_save_epg: error occurred while downloading asset %s(%s) epg data." % (channel.id, channel.name), xbmc.LOGERROR)
-                    del channels[0]
-                    return False
+                    return
 
             if len(epg_data) == 0:
                 xbmc.log("KyivstarService step_save_epg: asset %s(%s) does not have epg data." % (channel.id, channel.name), xbmc.LOGDEBUG)
-                del channels[0]
-                return False
+                return
 
             service.archive_manager.update_programs(channel, epg_data)
 
@@ -167,9 +166,9 @@ class SaveManager():
                     etree.SubElement(xml_program, "title").text = program['title']
                     if service.addon.getSetting('epg_include_description') == 'true':
                         etree.SubElement(xml_program, "desc").text = strip_html(program['desc'])
-            del channels[0]
-            return False
 
+    def finish_epg(self, service):
+        xml_root = self.epg_xml_root
         tree = etree.ElementTree(xml_root)
         etree.indent(tree, space="  ", level=0)
 
@@ -185,4 +184,3 @@ class SaveManager():
         service.archive_manager.check_programs(True)
 
         xbmc.log("KyivstarService: Saving EPG completed.", xbmc.LOGDEBUG)
-        return True

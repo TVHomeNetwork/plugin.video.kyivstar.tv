@@ -332,12 +332,13 @@ class KyivstarService:
                     if epg_start_saving:
                         epg_start_saving = False
                     for _ in range(int(self.addon.getSetting('epg_group_requests_count'))):
-                        if self.save_manager.process_epg(self):
-                            if self.addon.getSetting('iptv_sc_reload_when_epg_saved') == 'true':
-                                self.restart_iptv_simple()
-                            loc_str = self.addon.getLocalizedString(30211) # 'Save EPG completed.'
-                            xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
-                            break
+                        self.save_manager.process_epg(self)
+                    if not self.save_manager.check_epg():
+                        self.save_manager.finish_epg(self)
+                        if self.addon.getSetting('iptv_sc_reload_when_epg_saved') == 'true':
+                            self.restart_iptv_simple()
+                        loc_str = self.addon.getLocalizedString(30211) # 'Save EPG completed.'
+                        xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
                     wait_time = int(self.addon.getSetting('epg_group_requests_delay'))
                 elif self.archive_manager.check_channels():
                     self.archive_manager.process_channel(self)
