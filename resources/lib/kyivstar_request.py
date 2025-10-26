@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 class KyivstarRequest:
     def __init__(self, device_id, locale):
         self.base_api_url = "https://clients.production.vidmind.com/vidmind-stb-ws/{}"
+        self.base_local_url = None
         self.headers = headers = {
             'Origin': 'https://tv.kyivstar.ua',
             'Referer': 'https://tv.kyivstar.ua/',
@@ -16,6 +17,9 @@ class KyivstarRequest:
         self.error = None
         self.recoverable = True
         self.url = None
+
+    def set_base_local_url_port(self, port):
+        self.base_local_url = "http://127.0.0.1:%s/{}" % port
 
     def send(self, url, data=None, json=None, ret=True, ret_json=True):
         result = None
@@ -250,4 +254,104 @@ class KyivstarRequest:
         if self.error:
             xbmc.log("KyivstarRequest exception in get_asset_info: " + self.error, xbmc.LOGERROR)
             return []
+        return result
+
+    def local_get_channels(self):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('get_channels')
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_get_channels: " + self.error, xbmc.LOGERROR)
+            return {}
+        return result
+
+    def local_get_channel(self, asset):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('get_channel?asset=%s' % asset)
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_get_channel: " + self.error, xbmc.LOGERROR)
+            return {}
+        return result
+
+    def local_update_channel(self, asset, _property, value):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('update_channel?asset=%s&property=%s&value=%s' % (asset, _property, value))
+        result = self.send(url, ret=False)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_update_channel: " + self.error, xbmc.LOGERROR)
+            return False
+        return result
+
+    def local_move_channel(self, asset, position):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('move_channel?asset=%s&position=%s' % (asset, position))
+        result = self.send(url, ret=False)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_move_channel: " + self.error, xbmc.LOGERROR)
+            return False
+        return result
+
+    def local_execute(self, command):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('execute?command=%s' % command)
+        result = self.send(url, ret=False)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_execute: " + self.error, xbmc.LOGERROR)
+            return False
+        return result
+
+    def local_get_archive(self, args):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('get_archive?%s' % args)
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_get_archive: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
+
+    def local_get_archive_channels(self):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('get_archive_channels')
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_get_archive_channels: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
+
+    def local_set_archive_channels(self, channels):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('set_archive_channels?%s' % channels)
+        result = self.send(url, ret=False)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_set_archive_channels: " + self.error, xbmc.LOGERROR)
+            return False
+        return result
+
+    def local_get_archive_filters(self, _type):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('get_archive_filters?type=%s' % _type)
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_get_archive_filters: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
+
+    def local_reset_archive(self):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('reset_archive')
+        result = self.send(url, ret=False)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_reset_archive: " + self.error, xbmc.LOGERROR)
+            return False
         return result

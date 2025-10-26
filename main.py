@@ -604,12 +604,7 @@ def show_archive():
             return
 
         filter_type = filter_type_ids[index]
-
-        port = service.addon.getSetting('live_stream_server_port')
-        url = 'http://127.0.0.1:%s/get_archive_filters' % port
-        url += '?{}'.format(urlencode({'type': filter_type}, doseq=True))
-        response = requests.get(url)
-        elems = response.json()
+        elems = service.request.local_get_archive_filters(filter_type)
 
         heading = filter_types[filter_type][locale]
         preselect = []
@@ -686,11 +681,7 @@ def show_archive():
 
     elif select == 'channels':
         channels = service.get_enabled_channels()
-
-        port = service.addon.getSetting('live_stream_server_port')
-        url = 'http://127.0.0.1:%s/get_archive_channels' % port
-        response = requests.get(url)
-        activated_channel_ids = set(response.json())
+        activated_channel_ids = set(service.request.local_get_archive_channels())
 
         names = []
         preselect = []
@@ -706,10 +697,7 @@ def show_archive():
             return
 
         selected_channel_ids = [channels[i].id for i in indexes]
-        port = service.addon.getSetting('live_stream_server_port')
-        url = 'http://127.0.0.1:%s/set_archive_channels' % port
-        url += '?{}'.format(urlencode({'channels': selected_channel_ids}, doseq=True))
-        requests.get(url)
+        service.request.local_set_archive_channels(urlencode({'channels': selected_channel_ids}, doseq=True))
 
         del args['select']
         url = plugin.url_for(show_archive)
@@ -732,12 +720,7 @@ def show_archive():
             del args['select']
             xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
-    port = service.addon.getSetting('live_stream_server_port')
-    url = 'http://127.0.0.1:%s/get_archive' % port
-    url += '?{}'.format(urlencode(args, doseq=True))
-    response = requests.get(url)
-    elems = response.json()
-
+    elems = service.request.local_get_archive(urlencode(args, doseq=True))
     for elem in elems:
         li = xbmcgui.ListItem(label=elem['name'])
         video_info = li.getVideoInfoTag()
@@ -778,16 +761,11 @@ def reset_archive():
     if not result:
         return
 
-    port = service.addon.getSetting('live_stream_server_port')
-    url = 'http://127.0.0.1:%s/reset_archive' % port
-    requests.get(url)
+    service.request.local_reset_archive()
 
 @plugin.route('/channel_manager')
 def show_channel_manager():
-    port = service.addon.getSetting('live_stream_server_port')
-    url = 'http://127.0.0.1:%s/get_channels' % port
-    response = requests.get(url)
-    channels = response.json()
+    channels = service.request.local_get_channels()
 
     loc_str = service.addon.getLocalizedString(30501) # 'Disabled'
     li = xbmcgui.ListItem(label='%s (%s)' % (loc_str, len(channels['disabled'])))
@@ -849,10 +827,7 @@ def show_channel_manager():
 
 @plugin.route('/channel_manager/dir/<category>')
 def show_dir(category):
-    port = service.addon.getSetting('live_stream_server_port')
-    url = 'http://127.0.0.1:%s/get_channels' % port
-    response = requests.get(url)
-    channels = response.json()
+    channels = service.request.local_get_channels()
 
     for channel in channels[category]:
         li = xbmcgui.ListItem(label=channel['name'])
@@ -874,19 +849,12 @@ def send_command(command):
             return
         command = 'load'
 
-    port = service.addon.getSetting('live_stream_server_port')
-    url = 'http://127.0.0.1:%s/execute?command=%s' % (port, command)
-
-    requests.get(url)
-
+    service.request.local_execute(command)
     xbmc.executebuiltin('Container.Refresh')
 
 @plugin.route('/channel_manager/channel/<asset>')
 def show_channel(asset):
-    port = service.addon.getSetting('live_stream_server_port')
-    url = 'http://127.0.0.1:%s/get_channel?asset=%s' % (port, asset)
-    response = requests.get(url)
-    channel = response.json()
+    channel = service.request.local_get_channel(asset)
 
     loc_str = service.addon.getLocalizedString(30507) # 'Preview'
     li = xbmcgui.ListItem(label=loc_str)
@@ -969,12 +937,8 @@ def show_channel(asset):
 
 @plugin.route('/channel_manager/channel/<asset>/<_property>')
 def update_channel(asset, _property):
-    port = service.addon.getSetting('live_stream_server_port')
     if _property == 'move':
-        url = 'http://127.0.0.1:%s/get_channels' % port
-        response = requests.get(url)
-        channels = response.json()
-
+        channels = service.request.local_get_channels()
         position = 0
         for channel in channels['enabled']:
             if channel['id'] == asset:
@@ -988,32 +952,25 @@ def update_channel(asset, _property):
         xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
         return
 
-    url = 'http://127.0.0.1:%s/get_channel?asset=%s' % (port, asset)
-    response = requests.get(url)
-    channel = response.json()
-
-    url = 'http://127.0.0.1:%s/update_channel?asset=%s&property=%s&value=' % (port, asset, _property)
+    channel = service.request.local_get_channel(asset)
 
     if _property == 'enabled':
-        url += 'unused'
+        value = 'unused'
     elif _property == 'name':
         loc_str = service.addon.getLocalizedString(30512) # 'Change channel name'
         value = xbmcgui.Dialog().input(loc_str, defaultt=channel['name'])
         if value == '' or value == channel['name']:
             return
-        url += quote(value)
     elif _property == 'logo':
         loc_str = service.addon.getLocalizedString(30513) # 'Change channel logo'
         value = xbmcgui.Dialog().browseSingle(2, loc_str, '', '.jpg|.png', False, False, channel['logo'])
         if value == '' or value == channel['logo']:
             return
-        url += quote(value)
     elif _property == 'chno':
         loc_str = service.addon.getLocalizedString(30516) # 'Change channel number'
         value = xbmcgui.Dialog().input(loc_str, defaultt=channel['chno'], type=1)
         if value == channel['chno']:
             return
-        url += quote(value)
     elif _property == 'groups':
         all_groups = channel['all_groups']
         groups = channel['groups']
@@ -1025,7 +982,7 @@ def update_channel(asset, _property):
         values = [value for index, value in enumerate(all_groups) if index in indexes]
         if groups == values:
             return
-        url += quote(';'.join(values))
+        value = ';'.join(values)
     elif _property == 'rename_group':
         all_groups = channel['all_groups']
         loc_str = service.addon.getLocalizedString(30518) # 'Rename group'
@@ -1036,13 +993,12 @@ def update_channel(asset, _property):
         new_value = xbmcgui.Dialog().input(loc_str, defaultt=old_value)
         if new_value == '' or new_value == old_value:
             return
-        url += quote('%s;%s' % (old_value, new_value))
+        value = '%s;%s' % (old_value, new_value)
     elif _property == 'create_group':
         loc_str = service.addon.getLocalizedString(30519) # 'Create new group'
         value = xbmcgui.Dialog().input(loc_str, defaultt='')
         if value == '' or value in channel['all_groups']:
             return
-        url += quote(value)
     elif _property == 'remove_groups':
         all_groups = channel['all_groups']
         loc_str = service.addon.getLocalizedString(30520) # 'Remove chosen groups'
@@ -1059,21 +1015,15 @@ def update_channel(asset, _property):
         result = xbmcgui.Dialog().yesno(loc_str_1, loc_str_2, yeslabel=loc_str_3, nolabel=loc_str_4)
         if not result:
             return
-        url += quote(';'.join(values))
+        value = ';'.join(values)
 
-    requests.get(url)
-
+    service.request.local_update_channel(asset, _property, quote(value))
     xbmc.executebuiltin('Container.Refresh')
 
 @plugin.route('/channel_manager/move/<asset>/<position>')
 def move_channel(asset, position):
-    port = service.addon.getSetting('live_stream_server_port')
-    url = 'http://127.0.0.1:%s/move_channel?asset=%s&position=%s' % (port, asset, position)
-
-    requests.get(url)
-
-    path = 'plugin://%s/channel_manager' % service.addon.getAddonInfo('id')
-    xbmc.executebuiltin('Container.Update("%s", "replace")' % path)
+    service.request.local_move_channel(asset, position)
+    xbmc.executebuiltin('Container.Update("%s", "replace")' % plugin.url_for(show_channel_manager))
 
 @plugin.route('/settings')
 def show_settings():

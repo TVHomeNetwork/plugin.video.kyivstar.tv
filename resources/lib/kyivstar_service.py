@@ -106,6 +106,8 @@ class KyivstarServiceMonitor(xbmc.Monitor):
 
     def set_server_port(self, setting):
         self.service.live_stream_server.stop()
+        port = setting['live_stream_server_port_new_value']
+        self.service.request.set_base_local_url_port(port)
         self.service.live_stream_server.start()
         return True
 
@@ -131,6 +133,7 @@ class KyivstarService:
         locale = self.addon.getSetting('locale')
 
         self.request = KyivstarRequest(device_id, locale)
+        self.request.set_base_local_url_port(self.addon.getSetting('live_stream_server_port'))
 
         self.save_manager = SaveManager()
         self.save_manager.set_m3u_dir(self.addon.getSetting('path_m3u'))
