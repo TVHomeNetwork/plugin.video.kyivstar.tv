@@ -9,7 +9,7 @@ import xbmcvfs
 
 from urllib.parse import quote, parse_qs, urlencode
 from resources.lib.kyivstar_service import KyivstarService
-from resources.lib.common import SessionStatus
+from resources.lib.common import SessionStatus, strip_html
 
 service = KyivstarService()
 plugin = routing.Plugin()
@@ -351,6 +351,76 @@ def root():
 
     xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
 
+@plugin.route('/series/<asset_id>/<season>')
+def show_series(asset_id, season):
+    session_id = service.addon.getSetting('session_id')
+    locale = service.addon.getSetting('locale')
+
+    xbmcplugin.setContent(handle, 'videos')
+
+    season = int(season)
+
+    query = ''
+    if len(sys.argv) > 2:
+        query = sys.argv[2][1:]
+    args = parse_qs(query)
+    offset = int(args.get('offset', [0])[0])
+    limit = int(args.get('limit', [20])[0])
+
+    if season == 0:
+        elem = service.request.get_asset_info(session_id, asset_id)
+        if len(elem) == 0:
+            xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
+            return
+
+        elem = elem[0]
+        season_name = { 'en_US' : 'Season', 'uk_UA' : 'Сезон', 'ru_RU' : 'Сезон' }
+        for i in elem.get('seasons', []):
+            loc_str = '%s %s' % (season_name[locale], i['number'])
+            li = xbmcgui.ListItem(label=loc_str)
+            video_info = li.getVideoInfoTag()
+            if 'releaseDate' in elem:
+                video_info.setYear(elem['releaseDate'])
+            if 'ratings' in elem:
+                rating = elem['ratings'][0]
+                video_info.setRating(rating['movieRating'], rating['numberOfVotes'], rating['ratingProviderType'].lower())
+            video_info.setTitle(elem['name'])
+            image = next(iter([i['url'] for i in elem['images'] if '2_3_XL' in i['url']]), '')
+            li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
+            li.setProperty('IsPlayable', 'false')
+            url = plugin.url_for(show_series, asset_id=asset_id, season=i['number'])
+            xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    else:
+        elems = service.request.get_asset_tvgroup_info(session_id, asset_id, season, offset, limit)
+        for elem in elems:
+            li = xbmcgui.ListItem(label=elem['name'])
+            video_info = li.getVideoInfoTag()
+            if 'releaseDate' in elem:
+                video_info.setYear(elem['releaseDate'])
+            if 'ratings' in elem:
+                rating = elem['ratings'][0]
+                video_info.setRating(rating['movieRating'], rating['numberOfVotes'], rating['ratingProviderType'].lower())
+            video_info.setTitle(elem['name'])
+            video_info.setPlot(strip_html(elem['plot']))
+            image = next(iter([i['url'] for i in elem['images'] if '2_3_XL' in i['url']]), '')
+            li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
+            li.setProperty('IsPlayable', 'true')
+            url = plugin.url_for(play, videoid='%s-VIRTUAL|-1' % elem['assetId'])
+            xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+
+        if len(elems) == limit:
+            control_next = { 'en_US' : 'Next', 'uk_UA' : 'Наступна', 'ru_RU' : 'Следующая' }
+            li = xbmcgui.ListItem(label=control_next[locale])
+            icon = service.addon.getAddonInfo('path') + '/resources/images/next.png'
+            li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
+            args['offset'] = offset + len(elems)
+            url = plugin.url_for(show_series, asset_id=asset_id, season=season)
+            url += '?{}'.format(urlencode(args, doseq=True))
+            xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+
+    xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
+
 @plugin.route('/search')
 def search():
     loc_str = service.addon.getLocalizedString(30525) # 'Input search query'
@@ -379,9 +449,14 @@ def do_search(query):
         video_info.setTitle(elem['name'])
         image = next(iter([i['url'] for i in elem['images'] if '2_3_XL' in i['url']]), '')
         li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
-        li.setProperty('IsPlayable', 'true')
-        url = plugin.url_for(play, videoid='%s-VIRTUAL|-1' % elem['assetId'])
-        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+        if elem['assetType'] == 'SERIES':
+            li.setProperty('IsPlayable', 'false')
+            url = plugin.url_for(show_series, asset_id=elem['assetId'], season=0)
+            xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+        else:
+            li.setProperty('IsPlayable', 'true')
+            url = plugin.url_for(play, videoid='%s-VIRTUAL|-1' % elem['assetId'])
+            xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
     xbmcplugin.setContent(handle, 'videos')
     xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
@@ -526,9 +601,14 @@ def show_videos(area):
         video_info.setTitle(elem['name'])
         image = next(iter([i['url'] for i in elem['images'] if '2_3_XL' in i['url']]), '')
         li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
-        li.setProperty('IsPlayable', 'true')
-        url = plugin.url_for(play, videoid='%s-VIRTUAL|-1' % elem['assetId'])
-        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
+        if elem['assetType'] == 'SERIES':
+            li.setProperty('IsPlayable', 'false')
+            url = plugin.url_for(show_series, asset_id=elem['assetId'], season=0)
+            xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+        else:
+            li.setProperty('IsPlayable', 'true')
+            url = plugin.url_for(play, videoid='%s-VIRTUAL|-1' % elem['assetId'])
+            xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
     if len(elems) == limit:
         control_next = { 'en_US' : 'Next', 'uk_UA' : 'Наступна', 'ru_RU' : 'Следующая' }

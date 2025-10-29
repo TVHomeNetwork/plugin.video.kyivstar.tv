@@ -256,6 +256,14 @@ class KyivstarRequest:
             return []
         return result
 
+    def get_asset_tvgroup_info(self, session_id, asset_id, season_number, offset, limit):
+        url = self.base_api_url.format('api/v1/gallery/tvgroup/%s;jsessionid=%s?seasonNumber=%s&offset=%s&limit=%s' % (asset_id, session_id, season_number, offset, limit))
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_asset_tvgroup_info: " + self.error, xbmc.LOGERROR)
+            return []
+        return result
+
     def local_get_channels(self):
         if self.base_local_url is None:
             return None
