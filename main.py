@@ -236,6 +236,12 @@ def logout():
     service.addon.setSetting('session_id', '')
     service.set_session_status(SessionStatus.EMPTY)
 
+def get_local_elem_stream_url(asset_id, epg=None):
+    port = int(service.addon.getSetting('live_stream_server_port'))
+    if epg is None:
+        return 'http://127.0.0.1:%s/playlist.m3u8?asset=%s' % (port, asset_id)
+    return 'http://127.0.0.1:%s/playlist.m3u8?asset=%s&epg=%s' % (port, asset_id, epg)
+
 @plugin.route('/play/<videoid>')
 def play(videoid):
     if service.get_session_status() == SessionStatus.EMPTY:
@@ -248,37 +254,30 @@ def play(videoid):
     user_id = service.addon.getSetting('user_id')
 
     videoid, epg = videoid.split('|')
-    videoid, video_type = videoid.split('-')
-    virtual = video_type=='VIRTUAL'
+    asset_id, video_type = videoid.split('-')
 
-    epg_str = 'null'
-    if epg != 'null':
-        epg_int = int(epg)
-        epg_str = time.strftime('%Y.%m.%d %H:%M:%S', time.gmtime(epg_int))
-        epg_time = epg + '000'
+    is_virtual = (video_type == 'VIRTUAL')
+    is_live = (epg == 'null')
 
-    xbmc.log("KyivstarPlay: asset_id = %s, video_type = %s, epg_time = %s(%s)" % (videoid, video_type, epg, epg_str), xbmc.LOGINFO)
+    epg_str = 'null' if is_live else time.strftime('%Y.%m.%d %H:%M:%S', time.gmtime(int(epg)))
+    epg = None if is_live else epg + '000'
 
-    inputstream = service.addon.getSetting('stream_inputstream')
+    xbmc.log("KyivstarPlay: asset_id = %s, video_type = %s, epg_time = %s(%s)" % (asset_id, video_type, epg, epg_str), xbmc.LOGINFO)
+
+    use_stream_manager = (service.addon.getSetting('live_stream_server_enabled') == 'true')
+    remove_ads = (service.addon.getSetting('remove_ads_in_catchup_mode') == 'true')
+
     url = ''
-    if epg == 'null':
-        if virtual:
-            if service.addon.getSetting('live_stream_server_enabled') == 'true':
-                port = int(service.addon.getSetting('live_stream_server_port'))
-                url = 'http://127.0.0.1:%s/playlist.m3u8?asset=%s' % (port, videoid)
-            else:
-                url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual)
+    if is_virtual:
+        if use_stream_manager or remove_ads:
+            url = get_local_elem_stream_url(asset_id, epg)
         else:
-            url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual)
+            url = service.request.get_elem_stream_url(user_id, session_id, asset_id, virtual=True, date=epg)
     else:
-        if virtual:
-            if service.addon.getSetting('remove_ads_in_catchup_mode') == 'true':
-                port = int(service.addon.getSetting('live_stream_server_port'))
-                url = 'http://127.0.0.1:%s/playlist.m3u8?asset=%s&epg=%s' % (port, videoid, epg_time)
-            else:
-                url = service.request.get_elem_stream_url(user_id, session_id, videoid, virtual=virtual, date=epg_time)
+        if is_live:
+            url = service.request.get_elem_stream_url(user_id, session_id, asset_id, virtual=False)
         else:
-            url = service.request.get_elem_playback_stream_url(user_id, session_id, videoid, epg_time)
+            url = service.request.get_elem_playback_stream_url(user_id, session_id, asset_id, epg)
 
     if not url.startswith('http://127.0.0.1'):
         url += '|User-Agent="%s"' % service.request.headers['User-Agent']
@@ -289,27 +288,27 @@ def play(videoid):
     play_item = xbmcgui.ListItem(path=url)
     play_item.setMimeType('application/vnd.apple.mpegurl')
 
+    inputstream = service.addon.getSetting('stream_inputstream')
     if inputstream != 'default':
         play_item.setProperty('inputstream', inputstream)
 
-    play_item.setProperty('inputstream.ffmpegdirect.open_mode', 'ffmpeg')
-    play_item.setProperty('inputstream.ffmpegdirect.manifest_type', 'hls')
-
-    if not virtual:
-        if epg != 'null':
+    if inputstream == 'inputstream.ffmpegdirect':
+        play_item.setProperty('inputstream.ffmpegdirect.open_mode', 'ffmpeg')
+        play_item.setProperty('inputstream.ffmpegdirect.manifest_type', 'hls')
+    elif inputstream == 'inputstream.adaptive':
+        if not is_virtual and not is_live:
             #TODO: inputstream.ffmpegdirect need similar option for unfinished catchup
             play_item.setProperty('inputstream.adaptive.play_timeshift_buffer', 'true')
-    else:
-        if epg == 'null':
-            # VIRTUAL channel in live mode return full stream like in VOD mode,
-            # so we need to set resume point of video to current time. If we dont
-            # do this, video start from the beginning of the file.
-            cur_program_epg = service.request.get_elem_cur_program_epg_data(session_id, videoid)
-            if 'start' in cur_program_epg and 'finish' in cur_program_epg:
-                duration = cur_program_epg['finish']/1000 - cur_program_epg['start']/1000
-                live_point = time.time() - cur_program_epg['start']/1000
-                video_info = play_item.getVideoInfoTag()
-                video_info.setResumePoint(live_point, duration)
+
+    if is_virtual and is_live and not use_stream_manager:
+        # Set resume point of video to current time.
+        cur_program_epg = service.request.get_elem_cur_program_epg_data(session_id, asset_id)
+        if 'start' in cur_program_epg and 'finish' in cur_program_epg:
+            duration = cur_program_epg['finish']/1000 - cur_program_epg['start']/1000
+            live_point = time.time() - cur_program_epg['start']/1000
+            video_info = play_item.getVideoInfoTag()
+            video_info.setResumePoint(live_point, duration)
+
     xbmcplugin.setResolvedUrl(handle, True, listitem=play_item)
 
 @plugin.route('')
