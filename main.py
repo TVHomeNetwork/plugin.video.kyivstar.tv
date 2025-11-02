@@ -350,6 +350,40 @@ def root():
 
     xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
 
+def get_asset_list_item(asset, label=None):
+    if label is None:
+        label = asset.get('name', '')
+
+    purchased = asset.get('purchased', True)
+    if not purchased:
+        label = f'[COLOR=red]{label}[/COLOR]'
+
+    li = xbmcgui.ListItem(label=label)
+    video_info = li.getVideoInfoTag()
+
+    year = asset['release_date'] if 'release_date' in asset else asset.get('releaseDate')
+    if year: video_info.setYear(year)
+
+    rating = asset.get('ratings', [None])[0]
+    if rating: video_info.setRating(rating['movieRating'], rating['numberOfVotes'], rating['ratingProviderType'].lower())
+
+    duration = asset.get('duration')
+    if duration: video_info.setDuration(duration)
+
+    plot = asset['shortPlot'] if 'shortPlot' in asset else asset.get('plot')
+    if plot: video_info.setPlot(strip_html(plot))
+
+    title = asset.get('name')
+    if title: video_info.setTitle(title)
+
+    if 'image' in asset:
+        image = asset['image']
+    else:
+        image = next(iter([i['url'] for i in asset['images'] if '2_3_XL' in i['url']]), '')
+    li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
+
+    return li
+
 @plugin.route('/series/<asset_id>/<season>')
 def show_series(asset_id, season):
     session_id = service.addon.getSetting('session_id')
@@ -376,16 +410,7 @@ def show_series(asset_id, season):
         season_name = { 'en_US' : 'Season', 'uk_UA' : 'Сезон', 'ru_RU' : 'Сезон' }
         for i in elem.get('seasons', []):
             loc_str = '%s %s' % (season_name[locale], i['number'])
-            li = xbmcgui.ListItem(label=loc_str)
-            video_info = li.getVideoInfoTag()
-            if 'releaseDate' in elem:
-                video_info.setYear(elem['releaseDate'])
-            if 'ratings' in elem:
-                rating = elem['ratings'][0]
-                video_info.setRating(rating['movieRating'], rating['numberOfVotes'], rating['ratingProviderType'].lower())
-            video_info.setTitle(elem['name'])
-            image = next(iter([i['url'] for i in elem['images'] if '2_3_XL' in i['url']]), '')
-            li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
+            li = get_asset_list_item(elem, loc_str)
             li.setProperty('IsPlayable', 'false')
             url = plugin.url_for(show_series, asset_id=asset_id, season=i['number'])
             xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
@@ -393,17 +418,7 @@ def show_series(asset_id, season):
     else:
         elems = service.request.get_asset_tvgroup_info(session_id, asset_id, season, offset, limit)
         for elem in elems:
-            li = xbmcgui.ListItem(label=elem['name'])
-            video_info = li.getVideoInfoTag()
-            if 'releaseDate' in elem:
-                video_info.setYear(elem['releaseDate'])
-            if 'ratings' in elem:
-                rating = elem['ratings'][0]
-                video_info.setRating(rating['movieRating'], rating['numberOfVotes'], rating['ratingProviderType'].lower())
-            video_info.setTitle(elem['name'])
-            video_info.setPlot(strip_html(elem['plot']))
-            image = next(iter([i['url'] for i in elem['images'] if '2_3_XL' in i['url']]), '')
-            li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
+            li = get_asset_list_item(elem)
             li.setProperty('IsPlayable', 'true')
             url = plugin.url_for(play, videoid='%s-VIRTUAL|-1' % elem['assetId'])
             xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
@@ -438,16 +453,7 @@ def do_search(query):
     for elem in elems:
         if elem['assetType'] != 'MOVIE' and elem['assetType'] != 'SERIES':
             continue
-        li = xbmcgui.ListItem(label=elem['name'])
-        video_info = li.getVideoInfoTag()
-        if 'releaseDate' in elem:
-            video_info.setYear(elem['releaseDate'])
-        if 'ratings' in elem:
-            rating = elem['ratings'][0]
-            video_info.setRating(rating['movieRating'], rating['numberOfVotes'], rating['ratingProviderType'].lower())
-        video_info.setTitle(elem['name'])
-        image = next(iter([i['url'] for i in elem['images'] if '2_3_XL' in i['url']]), '')
-        li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
+        li = get_asset_list_item(elem)
         if elem['assetType'] == 'SERIES':
             li.setProperty('IsPlayable', 'false')
             url = plugin.url_for(show_series, asset_id=elem['assetId'], season=0)
@@ -589,17 +595,7 @@ def show_videos(area):
 
     elems = service.request.get_content_area_elems(session_id, compilation, filters, sort, offset, limit)
     for elem in elems:
-        li = xbmcgui.ListItem(label=elem['name'])
-        video_info = li.getVideoInfoTag()
-        if 'releaseDate' in elem:
-            video_info.setYear(elem['releaseDate'])
-        if 'ratings' in elem:
-            rating = elem['ratings'][0]
-            video_info.setRating(rating['movieRating'], rating['numberOfVotes'], rating['ratingProviderType'].lower())
-        video_info.setPlot(elem['shortPlot'])
-        video_info.setTitle(elem['name'])
-        image = next(iter([i['url'] for i in elem['images'] if '2_3_XL' in i['url']]), '')
-        li.setArt({'icon': image, 'fanart': service.addon.getAddonInfo('fanart')})
+        li = get_asset_list_item(elem)
         if elem['assetType'] == 'SERIES':
             li.setProperty('IsPlayable', 'false')
             url = plugin.url_for(show_series, asset_id=elem['assetId'], season=0)
@@ -801,18 +797,7 @@ def show_archive():
 
     elems = service.request.local_get_archive(urlencode(args, doseq=True))
     for elem in elems:
-        li = xbmcgui.ListItem(label=elem['name'])
-        video_info = li.getVideoInfoTag()
-        if 'release_date' in elem:
-            video_info.setYear(elem['release_date'])
-        if 'plot' in elem:
-            video_info.setPlot(elem['plot'])
-        if 'name' in elem:
-            video_info.setTitle(elem['name'])
-        if 'duration' in elem:
-            video_info.setDuration(elem['duration'])
-        if 'image' in elem:
-            li.setArt({'icon': elem['image'], 'fanart': service.addon.getAddonInfo('fanart')})
+        li = get_asset_list_item(elem)
         li.setProperty('IsPlayable', 'true')
         url = plugin.url_for(play, videoid=elem['videoid'])
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
