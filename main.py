@@ -269,7 +269,7 @@ def play(videoid):
 
     url = ''
     if is_virtual:
-        if use_stream_manager or remove_ads:
+        if (is_live and use_stream_manager) or (not is_live and remove_ads):
             url = get_local_elem_stream_url(asset_id, epg)
         else:
             url = service.request.get_elem_stream_url(user_id, session_id, asset_id, virtual=True, date=epg)
