@@ -6,9 +6,12 @@ This plugin is based on: https://github.com/david-hazi/plugin.video.sweettv
 
 # Installation:
 
-Download the repository as ZIP. Unpack somwhere.
-Rename the top directory from *plugin.video.kyivstar.tv-main* to *plugin.video.kyivstar.tv*.
-Pack back to ZIP and install this file in Kodi.
+To get automatic updates you can install my [repository](https://github.com/TVHomeNetwork/kodi.repository).
+
+Or download any release version from [Releases](https://github.com/TVHomeNetwork/plugin.video.kyivstar.tv/releases).
+
+Or to get fresh version, clone this repository as zip. Unpack somwhere. Rename the top directory from *plugin.video.kyivstar.tv-main* to *plugin.video.kyivstar.tv*.
+Pack back to zip and install this file in Kodi.
 
 # Setup:
 
