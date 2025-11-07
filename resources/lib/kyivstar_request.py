@@ -324,6 +324,16 @@ class KyivstarRequest:
             return []
         return result
 
+    def local_get_archive_videoid(self, program_asset_id):
+        if self.base_local_url is None:
+            return None
+        url = self.base_local_url.format('get_archive_videoid?program_asset_id=%s' % program_asset_id)
+        result = self.send(url)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in local_get_archive_videoid: " + self.error, xbmc.LOGERROR)
+            return ''
+        return result
+
     def local_get_archive_channels(self):
         if self.base_local_url is None:
             return None

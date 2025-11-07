@@ -237,6 +237,7 @@ def logout():
     service.set_session_status(SessionStatus.EMPTY)
 
 def get_local_elem_stream_url(asset_id, epg=None):
+    service.request.error = None
     port = int(service.addon.getSetting('live_stream_server_port'))
     if epg is None:
         return 'http://127.0.0.1:%s/playlist.m3u8?asset=%s' % (port, asset_id)
@@ -279,6 +280,12 @@ def play(videoid):
         else:
             url = service.request.get_elem_playback_stream_url(user_id, session_id, asset_id, epg)
 
+    if service.request.error:
+        loc_str = service.addon.getLocalizedString(30216) # 'Error getting stream url. Check your logs for details.'
+        xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
+        xbmcplugin.setResolvedUrl(handle, False, xbmcgui.ListItem())
+        return
+
     if not url.startswith('http://127.0.0.1'):
         url += '|User-Agent="%s"' % service.request.headers['User-Agent']
         url += '&Referer="%s"' % service.request.headers['Referer']
@@ -310,6 +317,23 @@ def play(videoid):
             video_info.setResumePoint(live_point, duration)
 
     xbmcplugin.setResolvedUrl(handle, True, listitem=play_item)
+
+@plugin.route('/play_archive/<program_asset_id>')
+def play_archive(program_asset_id):
+    videoid = service.request.local_get_archive_videoid(program_asset_id)
+    if service.request.error:
+        loc_str = service.addon.getLocalizedString(30214) # 'Error accessing archive. Check your logs for details.'
+        xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
+        xbmcplugin.setResolvedUrl(handle, False, xbmcgui.ListItem())
+        return
+
+    if not videoid:
+        loc_str = service.addon.getLocalizedString(30215) # 'Program not found in archive'
+        xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
+        xbmcplugin.setResolvedUrl(handle, False, xbmcgui.ListItem())
+        return
+
+    return play(videoid)
 
 @plugin.route('')
 def root():
@@ -799,7 +823,7 @@ def show_archive():
     for elem in elems:
         li = get_asset_list_item(elem)
         li.setProperty('IsPlayable', 'true')
-        url = plugin.url_for(play, videoid=elem['videoid'])
+        url = plugin.url_for(play_archive, program_asset_id=elem['program_asset_id'])
         xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
     if len(elems) == limit:

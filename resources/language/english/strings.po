@@ -327,6 +327,18 @@ msgctxt "#30213"
 msgid "Inputstream addon does not found. Set value to default."
 msgstr ""
 
+msgctxt "#30214"
+msgid "Error accessing archive. Check your logs for details."
+msgstr ""
+
+msgctxt "#30215"
+msgid "Program not found in archive"
+msgstr ""
+
+msgctxt "#30216"
+msgid "Error getting stream url. Check your logs for details."
+msgstr ""
+
 # Plugin menu
 
 msgctxt "#30500"

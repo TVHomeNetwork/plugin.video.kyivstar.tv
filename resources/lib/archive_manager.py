@@ -721,12 +721,28 @@ class ArchiveManager():
             elements = cursor.fetchall()
             for i, element in enumerate(elements):
                 element = dict(element)
-                element['videoid'] = '%s-%s|%s' % (element['channel_asset_id'], element['type'], int(element['start']/1000))
                 element['genres'] = self.get_program_genres(element['program_asset_id'])
                 elements[i] = element
             cursor.close()
 
         return elements
+
+    def get_videoid(self, program_asset_id):
+        conn = self.conn
+        if conn is None:
+            return []
+
+        with self.lock:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT c.asset_id, c.type, p.start FROM programs AS p "
+                "JOIN channels AS c ON p.channel_id = c.channel_id "
+                "WHERE p.asset_id = ?",
+                (program_asset_id,)
+            )
+            row = cursor.fetchone()
+            cursor.close()
+        return f'{row['asset_id']}-{row['type']}|{int(row['start']/1000)}' if row else ''
 
     def vacuum(self):
         conn = self.conn

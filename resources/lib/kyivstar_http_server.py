@@ -134,6 +134,15 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 
         return 'application/json', json.dumps(archive_manager.get_elements(query, service)).encode('utf-8')
 
+    def handle_get_archive_videoid(self, url_query):
+        query = parse_qs(url_query)
+        program_asset_id = query['program_asset_id'][0]
+
+        service = self.server.service
+        archive_manager = service.archive_manager
+
+        return 'application/json', json.dumps(archive_manager.get_videoid(program_asset_id)).encode('utf-8')
+
     def handle_get_archive_channels(self):
         service = self.server.service
         archive_manager = service.archive_manager
@@ -186,6 +195,8 @@ class HttpGetHandler(BaseHTTPRequestHandler):
             content_type, content = self.handle_execute(url.query)
         elif url.path == '/get_archive':
             content_type, content = self.handle_get_archive(url.query)
+        elif url.path == '/get_archive_videoid':
+            content_type, content = self.handle_get_archive_videoid(url.query)
         elif url.path == '/get_archive_channels':
             content_type, content = self.handle_get_archive_channels()
         elif url.path == '/set_archive_channels':

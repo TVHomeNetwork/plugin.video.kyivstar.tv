@@ -327,6 +327,18 @@ msgctxt "#30213"
 msgid "Inputstream addon does not found. Set value to default."
 msgstr "Доповнення Inputstream не знайдено. Встановлено значення за замовчуванням."
 
+msgctxt "#30214"
+msgid "Error accessing archive. Check your logs for details."
+msgstr "Помилка доступу до архіву. Перегляньте журнали для отримання детальної інформації."
+
+msgctxt "#30215"
+msgid "Program not found in archive"
+msgstr "Програму не знайдено в архіві"
+
+msgctxt "#30216"
+msgid "Error getting stream url. Check your logs for details."
+msgstr "Помилка отримання URL-адреси потоку. Перегляньте журнали для отримання детальної інформації."
+
 # Plugin menu
 
 msgctxt "#30500"
