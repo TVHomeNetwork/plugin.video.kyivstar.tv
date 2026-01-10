@@ -208,7 +208,6 @@ def login():
         service.addon.setSetting('user_id', profile['userId'])
         service.addon.setSetting('session_id', profile['sessionId'])
         service.addon.setSetting('username', username)
-        service.addon.getSetting('password', password)
         service.addon.setSetting('logged', 'true')
         service.set_session_status(SessionStatus.ACTIVE)
 
