@@ -34,8 +34,10 @@ class KyivstarRequest:
             elif json:
                 response = requests.post(url, json=json, headers=self.headers)
             if ret:
-                result = response.json() if ret_json else response.text
-                if response.status_code != 200:
+                if response.status_code == 200:
+                    result = response.json() if ret_json else response.text
+                else:
+                    result = response.text
                     self.error = 'An unexpected status code of response - %s' % response.status_code
                     self.recoverable = False
             else:
