@@ -742,7 +742,7 @@ class ArchiveManager():
             )
             row = cursor.fetchone()
             cursor.close()
-        return f'{row['asset_id']}-{row['type']}|{int(row['start']/1000)}' if row else ''
+        return f"{row['asset_id']}-{row['type']}|{int(row['start']/1000)}" if row else ""
 
     def vacuum(self):
         conn = self.conn
