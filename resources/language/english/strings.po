@@ -226,6 +226,14 @@ msgctxt "#30107"
 msgid "Cancel"
 msgstr ""
 
+msgctxt "#30108"
+msgid "Via QR code"
+msgstr ""
+
+msgctxt "#30109"
+msgid "Connection code {}\nScan the QR code or go to kyivstar.tv/mytv\nIn the 'Connect TV device' section, enter the connection code. The code is valid for 3 minutes"
+msgstr ""
+
 msgctxt "#30110"
 msgid "Logout"
 msgstr ""

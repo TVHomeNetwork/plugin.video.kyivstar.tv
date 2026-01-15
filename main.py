@@ -1,4 +1,5 @@
 import sys
+import os
 import requests
 import routing
 import time
@@ -16,6 +17,12 @@ plugin = routing.Plugin()
 handle = int(sys.argv[1])
 
 class LoginDialog(xbmcgui.WindowDialog):
+    CANCEL = 0
+    PHONENUMBER = 1
+    PERSONAL_ACCOUNT = 2
+    ANONYMOUS = 3
+    QR_CODE = 4
+
     def __init__(self, phonenumber, username, password):
         height = self.getHeight()
         width = self.getWidth()
@@ -30,24 +37,27 @@ class LoginDialog(xbmcgui.WindowDialog):
         x = int(width/4)
         y = int(height/4)
 
-        texture = service.addon.getAddonInfo('path') + '/resources/images/background.jpg'
-        self.image0 = xbmcgui.ControlImage(x - margin, y - margin, window_width + 2*margin, window_height + 2*margin, texture)
-        self.addControl(self.image0)
+        addon_path = xbmcvfs.translatePath(service.addon.getAddonInfo('path'))
+        images_path = os.path.join(addon_path, 'resources/images')
 
-        texture = service.addon.getAddonInfo('path') + '/resources/images/head-button.png'
-        texture_focus = service.addon.getAddonInfo('path') + '/resources/images/head-button-focus.png'
+        texture = os.path.join(images_path, 'background.jpg')
+        self.image_background = xbmcgui.ControlImage(x - margin, y - margin, window_width + 2*margin, window_height + 2*margin, texture)
+        self.addControl(self.image_background)
+
+        texture = os.path.join(images_path, 'head-button.png')
+        texture_focus = os.path.join(images_path, 'head-button-focus.png')
         loc_str = service.addon.getLocalizedString(30100) # "Phone number"
-        self.select0 = xbmcgui.ControlButton(x + margin, y + margin, control_width_half - margin, control_height - 2*margin, loc_str, noFocusTexture=texture, focusTexture=texture_focus)
-        self.addControl(self.select0)
+        self.select_phonenumber = xbmcgui.ControlButton(x + margin, y + margin, control_width_half - margin, control_height - 2*margin, loc_str, noFocusTexture=texture, focusTexture=texture_focus)
+        self.addControl(self.select_phonenumber)
 
         x += control_width_half
         loc_str = service.addon.getLocalizedString(30101) # "Personal account"
-        self.select1 = xbmcgui.ControlButton(x, y + margin, control_width_half - margin, control_height - 2*margin, loc_str, noFocusTexture=texture, focusTexture=texture_focus)
-        self.addControl(self.select1)
+        self.select_personal_account = xbmcgui.ControlButton(x, y + margin, control_width_half - margin, control_height - 2*margin, loc_str, noFocusTexture=texture, focusTexture=texture_focus)
+        self.addControl(self.select_personal_account)
 
         x -= control_width_half
         y += control_height
-        texture = service.addon.getAddonInfo('path') + '/resources/images/edit.png'
+        texture = os.path.join(images_path, 'edit.png')
         loc_str = service.addon.getLocalizedString(30102) # "Username:"
         self.edit_username = xbmcgui.ControlEdit(x + margin, y + margin, control_width - 2*margin, control_height - 2*margin, loc_str, _alignment=4, noFocusTexture=texture, focusTexture=texture)
         self.edit_username.setText(username)
@@ -65,79 +75,169 @@ class LoginDialog(xbmcgui.WindowDialog):
         self.addControl(self.edit_password)
 
         y += control_height
-        texture = service.addon.getAddonInfo('path') + '/resources/images/button.png'
-        texture_focus = service.addon.getAddonInfo('path') + '/resources/images/button-focus.png'
-        loc_str = service.addon.getLocalizedString(30105) # "Anonymous Login"
-        self.button0 = xbmcgui.ControlButton(x + margin, y + margin, control_width - 2*margin, control_height - 2*margin, loc_str, alignment=6, noFocusTexture=texture, focusTexture=texture_focus)
-        self.addControl(self.button0)
-
-        y += control_height
+        texture = os.path.join(images_path, 'button.png')
+        texture_focus = os.path.join(images_path, 'button-focus.png')
         loc_str = service.addon.getLocalizedString(30107) # "Cancel"
-        self.button1 = xbmcgui.ControlButton(x + margin, y + margin, control_width_half - 2*margin, control_height - 2*margin, loc_str, alignment=6, noFocusTexture=texture, focusTexture=texture_focus)
-        self.addControl(self.button1)
+        self.button_cancel = xbmcgui.ControlButton(x + margin, y + margin, control_width_half - 2*margin, control_height - 2*margin, loc_str, alignment=6, noFocusTexture=texture, focusTexture=texture_focus)
+        self.addControl(self.button_cancel)
 
         x += control_width_half
         loc_str = service.addon.getLocalizedString(30106) # "Login"
-        self.button2 = xbmcgui.ControlButton(x + margin, y + margin, control_width_half - 2*margin, control_height - 2*margin, loc_str, alignment=6, noFocusTexture=texture, focusTexture=texture_focus)
-        self.addControl(self.button2)
-        
-        self.select0.controlRight(self.select1)
-        self.select0.controlDown(self.edit_username)
-        self.select1.controlLeft(self.select0)
-        self.select1.controlDown(self.edit_username)
-        self.edit_username.controlUp(self.select0)
+        self.button_login = xbmcgui.ControlButton(x + margin, y + margin, control_width_half - 2*margin, control_height - 2*margin, loc_str, alignment=6, noFocusTexture=texture, focusTexture=texture_focus)
+        self.addControl(self.button_login)
+
+        y += control_height
+        loc_str = service.addon.getLocalizedString(30108) # "Via QR code"
+        self.button_qr_code = xbmcgui.ControlButton(x + margin, y + margin, control_width_half - 2*margin, control_height - 2*margin, loc_str, alignment=6, noFocusTexture=texture, focusTexture=texture_focus)
+        self.addControl(self.button_qr_code)
+
+        x -= control_width_half
+        loc_str = service.addon.getLocalizedString(30105) # "Anonymous Login"
+        self.button_anonymous = xbmcgui.ControlButton(x + margin, y + margin, control_width_half - 2*margin, control_height - 2*margin, loc_str, alignment=6, noFocusTexture=texture, focusTexture=texture_focus)
+        self.addControl(self.button_anonymous)
+
+        self.select_phonenumber.controlRight(self.select_personal_account)
+        self.select_phonenumber.controlDown(self.edit_username)
+        self.select_personal_account.controlLeft(self.select_phonenumber)
+        self.select_personal_account.controlDown(self.edit_username)
+        self.edit_username.controlUp(self.select_phonenumber)
         self.edit_username.controlDown(self.edit_password)
         self.edit_password.controlUp(self.edit_username)
         self.edit_password.controlDown(self.edit_phonenumber)
         self.edit_phonenumber.controlUp(self.edit_password)
-        self.edit_phonenumber.controlDown(self.button0)
-        self.button0.controlUp(self.edit_phonenumber)
-        self.button0.controlDown(self.button1)
-        self.button1.controlUp(self.button0)
-        self.button1.controlRight(self.button2)
-        self.button2.controlUp(self.button0)
-        self.button2.controlLeft(self.button1)
+        self.edit_phonenumber.controlDown(self.button_cancel)
+        self.button_cancel.controlUp(self.edit_phonenumber)
+        self.button_cancel.controlRight(self.button_login)
+        self.button_cancel.controlDown(self.button_anonymous)
+        self.button_login.controlUp(self.edit_phonenumber)
+        self.button_login.controlLeft(self.button_cancel)
+        self.button_login.controlDown(self.button_qr_code)
+        self.button_anonymous.controlUp(self.button_cancel)
+        self.button_anonymous.controlRight(self.button_qr_code)
+        self.button_qr_code.controlUp(self.button_login)
+        self.button_qr_code.controlLeft(self.button_anonymous)
 
-        self.setFocus(self.select0)
+        self.setFocus(self.select_phonenumber)
 
         self.active = True
-        self.change_login_type(1)
+        self.change_login_type(LoginDialog.PHONENUMBER)
 
     def change_login_type(self, login_type):
         self.login_type = login_type
-        self.edit_username.setVisible(self.login_type == 2)
-        self.edit_password.setVisible(self.login_type == 2)
-        self.edit_phonenumber.setVisible(self.login_type == 1)
+        if self.login_type != LoginDialog.PHONENUMBER and self.login_type != LoginDialog.PERSONAL_ACCOUNT:
+            return
+        self.edit_username.setVisible(self.login_type == LoginDialog.PERSONAL_ACCOUNT)
+        self.edit_password.setVisible(self.login_type == LoginDialog.PERSONAL_ACCOUNT)
+        self.edit_phonenumber.setVisible(self.login_type == LoginDialog.PHONENUMBER)
 
     def onControl(self, control):
         control_id = control.getId()
-        if control_id == self.select0.getId():
-            self.change_login_type(1)
+        if control_id == self.select_phonenumber.getId():
+            self.change_login_type(LoginDialog.PHONENUMBER)
             return
-        if control_id == self.select1.getId():
-            self.change_login_type(2)
+        if control_id == self.select_personal_account.getId():
+            self.change_login_type(LoginDialog.PERSONAL_ACCOUNT)
             return
-        if control_id == self.button0.getId():
-            self.login_type = 3
-        if control_id == self.button1.getId():
-            self.login_type = 0
-        if control_id == self.button2.getId():
-            if self.login_type == 1 and self.edit_phonenumber.getText() == '':
+        if control_id == self.button_qr_code.getId():
+            self.change_login_type(LoginDialog.QR_CODE)
+        if control_id == self.button_anonymous.getId():
+            self.change_login_type(LoginDialog.ANONYMOUS)
+        if control_id == self.button_cancel.getId():
+            self.change_login_type(LoginDialog.CANCEL)
+        if control_id == self.button_login.getId():
+            if self.login_type == LoginDialog.PHONENUMBER and self.edit_phonenumber.getText() == '':
                 loc_str = service.addon.getLocalizedString(30200) # 'For login you must set phonenumber.'
                 xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
                 return
-            if self.login_type == 2 and (self.edit_username.getText() == '' or self.edit_password.getText() == ''):
+            if self.login_type == LoginDialog.PERSONAL_ACCOUNT and (self.edit_username.getText() == '' or self.edit_password.getText() == ''):
                 loc_str = service.addon.getLocalizedString(30201) # 'For login you must set username and password.'
                 xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
                 return
-        self.active=False
+        self.active = False
         self.close()
 
     def onAction(self, action):
         if action.getId() == xbmcgui.ACTION_PREVIOUS_MENU or action.getId() == xbmcgui.ACTION_NAV_BACK:
-            self.login_type = 0
-            self.active=False
+            self.change_login_type(LoginDialog.CANCEL)
+            self.active = False
             self.close()
+
+class QRCodeDialog(xbmcgui.WindowDialog):
+    def __init__(self, code, link):
+        super(QRCodeDialog, self).__init__()
+
+        import qrcode
+        img = qrcode.make(link)
+        profile_path = xbmcvfs.translatePath(service.addon.getAddonInfo('profile'))
+        qrcode_path = os.path.join(profile_path, 'qr_login.png')
+        img.save(qrcode_path)
+
+        height = self.getHeight()
+        width = self.getWidth()
+
+        window_height = int(height/2)
+        window_width = int(width/2)
+        margin = 10
+        control_height = int(window_height/5)
+        control_width = window_width
+        control_width_qrcode = int(control_height*3)
+        control_width_text = control_width - control_width_qrcode
+
+        x = int(width/4)
+        y = int(height/4)
+
+        addon_path = xbmcvfs.translatePath(service.addon.getAddonInfo('path'))
+        images_path = os.path.join(addon_path, 'resources/images')
+
+        texture = os.path.join(images_path, 'background.jpg')
+        self.image_background = xbmcgui.ControlImage(x - margin, y - margin, window_width + 2*margin, window_height + 2*margin, texture)
+        self.addControl(self.image_background)
+
+        texture = os.path.join(images_path, 'head-button.png')
+        texture_focus = os.path.join(images_path, 'head-button-focus.png')
+        loc_str = service.addon.getLocalizedString(30108) # "Via QR code"
+        self.select_phonenumber = xbmcgui.ControlButton(x + margin, y + margin, control_width - 2*margin, control_height - 2*margin, loc_str, noFocusTexture=texture, focusTexture=texture_focus)
+        self.addControl(self.select_phonenumber)
+
+        y += control_height
+        loc_str = service.addon.getLocalizedString(30109) # "Connection code {}\nScan the QR code or go to kyivstar.tv/mytv\nIn the 'Connect TV device' section, enter the connection code. The code is valid for 3 minutes"
+        self.textbox = xbmcgui.ControlTextBox(x + margin, y + margin, control_width_text - 2*margin, control_width_qrcode - 2*margin)
+        self.addControl(self.textbox)
+        self.textbox.setText(loc_str.format(code))
+        self.textbox.scroll(0)
+
+        x += control_width_text
+        self.qr_image = xbmcgui.ControlImage(x + margin, y + margin, control_width_qrcode - 2*margin, control_width_qrcode - 2*margin, qrcode_path)
+        self.addControl(self.qr_image)
+
+        x -= control_width_text
+        y += control_width_qrcode
+        texture = os.path.join(images_path, 'button.png')
+        texture_focus = os.path.join(images_path, 'button-focus.png')
+        loc_str = service.addon.getLocalizedString(30107) # "Cancel"
+        self.close_button = xbmcgui.ControlButton(x + margin, y + margin, control_width - 2*margin, control_height - 2*margin, loc_str, alignment=6, noFocusTexture=texture, focusTexture=texture_focus)
+        self.addControl(self.close_button)
+        self.setFocus(self.close_button)
+
+        self.active = True
+
+    def onControl(self, control):
+        if control.getId() == self.close_button.getId():
+            self.active = False
+            self.close()
+
+    def onAction(self, action):
+        if action.getId() == xbmcgui.ACTION_PREVIOUS_MENU or action.getId() == xbmcgui.ACTION_NAV_BACK:
+            self.active = False
+            self.close()
+
+def is_profile_loaded(profile):
+    if 'userId' in profile and 'sessionId' in profile:
+        return True
+
+    loc_str = service.addon.getLocalizedString(30202) # 'Error during login. Check your logs for details.'
+    xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
+    return False
 
 @plugin.route('/login')
 def login():
@@ -161,24 +261,14 @@ def login():
 
     del login_form
 
-    if login_type == 0:
+    if login_type == LoginDialog.CANCEL:
         return
 
     profile = service.request.login_anonymous()
-
-    if 'userId' not in profile or 'sessionId' not in profile:
-        loc_str = service.addon.getLocalizedString(30202) # 'Error during login. Check your logs for details.'
-        xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
+    if not is_profile_loaded(profile):
         return
 
-    if login_type == 3:
-        service.addon.setSetting('user_id', profile['userId'])
-        service.addon.setSetting('session_id', profile['sessionId'])
-        service.addon.setSetting('logged', 'true')
-        service.set_session_status(SessionStatus.ACTIVE)
-        return
-
-    if login_type == 1:
+    if login_type == LoginDialog.PHONENUMBER:
         if not service.request.send_auth_otp(profile['sessionId'], phonenumber):
             loc_str = service.addon.getLocalizedString(30202) # 'Error during login. Check your logs for details.'
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
@@ -186,30 +276,53 @@ def login():
 
         otp = xbmcgui.Dialog().input('Enter secret code', type=xbmcgui.INPUT_NUMERIC)
         profile = service.request.login(profile['sessionId'], phonenumber, otp=otp)
-
-        if 'userId' not in profile or 'sessionId' not in profile:
-            loc_str = service.addon.getLocalizedString(30202) # 'Error during login. Check your logs for details.'
-            xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
+        if not is_profile_loaded(profile):
             return
 
-        service.addon.setSetting('user_id', profile['userId'])
-        service.addon.setSetting('session_id', profile['sessionId'])
         service.addon.setSetting('phonenumber', phonenumber)
-        service.addon.setSetting('logged', 'true')
-        service.set_session_status(SessionStatus.ACTIVE)
-    else:
+
+    elif login_type == LoginDialog.PERSONAL_ACCOUNT:
         profile = service.request.login(profile['sessionId'], username, password=password)
 
-        if 'userId' not in profile or 'sessionId' not in profile:
+        if not is_profile_loaded(profile):
+            return
+
+        service.addon.setSetting('username', username)
+
+    elif login_type == LoginDialog.QR_CODE:
+        link_data = service.request.generate_link(profile['sessionId'])
+        if 'code' not in link_data or 'link' not in link_data:
             loc_str = service.addon.getLocalizedString(30202) # 'Error during login. Check your logs for details.'
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
             return
 
-        service.addon.setSetting('user_id', profile['userId'])
-        service.addon.setSetting('session_id', profile['sessionId'])
-        service.addon.setSetting('username', username)
-        service.addon.setSetting('logged', 'true')
-        service.set_session_status(SessionStatus.ACTIVE)
+        qr_code_form = QRCodeDialog(link_data['code'], link_data['link'])
+        qr_code_form.show()
+        is_signed_in = False
+        start_time = time.time()
+        last_elapsed_time = 0
+        while qr_code_form.active:
+            elapsed_time = max(0, time.time() - start_time)
+            if elapsed_time - last_elapsed_time >= 1:
+                is_signed_in = service.request.subscriber_signed_in(profile['sessionId'])
+                last_elapsed_time = elapsed_time
+            if is_signed_in or elapsed_time > 180:
+                qr_code_form.close()
+                break
+            xbmc.sleep(100)
+        del qr_code_form
+
+        if not is_signed_in:
+            return
+
+        profile = service.request.get_profile(profile['sessionId'])
+        if not is_profile_loaded(profile):
+            return
+
+    service.addon.setSetting('user_id', profile['userId'])
+    service.addon.setSetting('session_id', profile['sessionId'])
+    service.addon.setSetting('logged', 'true')
+    service.set_session_status(SessionStatus.ACTIVE)
 
 @plugin.route('/logout')
 def logout():
