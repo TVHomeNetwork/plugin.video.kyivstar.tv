@@ -21,18 +21,18 @@ class KyivstarRequest:
     def set_base_local_url_port(self, port):
         self.base_local_url = "http://127.0.0.1:%s/{}" % port
 
-    def send(self, url, data=None, json=None, ret=True, ret_json=True):
+    def send(self, url, data=None, json=None, ret=True, ret_json=True, cookies=None):
         result = None
         self.error = None
         self.recoverable = True
         self.url = url
         try:
             if data is None and json is None:
-                response = requests.get(url, headers=self.headers)
-            elif data:
-                response = requests.post(url, data=data, headers=self.headers)
-            elif json:
-                response = requests.post(url, json=json, headers=self.headers)
+                response = requests.get(url, headers=self.headers, cookies=cookies)
+            elif data is not None:
+                response = requests.post(url, data=data, headers=self.headers, cookies=cookies)
+            elif json is not None:
+                response = requests.post(url, json=json, headers=self.headers, cookies=cookies)
             if ret:
                 if response.status_code == 200:
                     result = response.json() if ret_json else response.text
