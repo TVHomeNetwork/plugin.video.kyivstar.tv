@@ -485,7 +485,7 @@ def root():
     icon = service.addon.getAddonInfo('path') + '/resources/images/settings.png'
     li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(show_settings)
-    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
     xbmcplugin.endOfDirectory(handle, cacheToDisc=True)
 
