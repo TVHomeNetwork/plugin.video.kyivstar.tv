@@ -340,7 +340,7 @@ def logout():
     user_id = service.addon.getSetting('user_id')
     session_id = service.addon.getSetting('session_id')
 
-    if user_id != 'anonymous' and not service.request.logout(session_id):
+    if user_id != 'anonymous' and not service.request.logout(session_id) and service.request.recoverable:
         loc_str = service.addon.getLocalizedString(30203) # 'Error during logout. Check your logs for details.'
         xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
         service.set_session_status(SessionStatus.INACTIVE)
