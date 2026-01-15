@@ -6,6 +6,7 @@ class KyivstarRequest:
     def __init__(self, device_id, locale):
         self.base_api_url = "https://clients.production.vidmind.com/vidmind-stb-ws/{}"
         self.base_local_url = None
+        self.base_auth_url = "https://kyivstar-auth.production.vidmind.com/kyivstar-auth/{}"
         self.headers = headers = {
             'Origin': 'https://tv.kyivstar.ua',
             'Referer': 'https://tv.kyivstar.ua/',
@@ -381,4 +382,32 @@ class KyivstarRequest:
         if self.error:
             xbmc.log("KyivstarRequest exception in local_reset_archive: " + self.error, xbmc.LOGERROR)
             return False
+        return result
+
+    def generate_link(self, session_id):
+        url = self.base_auth_url.format('access-code/generate/link')
+        cookies = { 'JSESSIONID': session_id }
+        result = self.send(url, data={}, cookies=cookies)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in generate_link: " + self.error, xbmc.LOGERROR)
+            return {}
+        return result
+
+    def subscriber_signed_in(self, session_id):
+        url = self.base_auth_url.format('subscriber/signed-in')
+        cookies = { 'JSESSIONID': session_id }
+        result = self.send(url, ret_json=False, cookies=cookies)
+        if self.error:
+            if '403' not in self.error:
+                xbmc.log("KyivstarRequest exception in subscriber_signed_in: " + self.error, xbmc.LOGERROR)
+            return False
+        return True
+
+    def get_profile(self, session_id):
+        url = self.base_api_url.format('api/v1/subscribers/me')
+        cookies = { 'JSESSIONID': session_id }
+        result = self.send(url, cookies=cookies)
+        if self.error:
+            xbmc.log("KyivstarRequest exception in get_profile: " + self.error, xbmc.LOGERROR)
+            return {}
         return result
