@@ -347,6 +347,10 @@ msgctxt "#30216"
 msgid "Error getting stream url. Check your logs for details."
 msgstr "Помилка отримання URL-адреси потоку. Перегляньте журнали для отримання детальної інформації."
 
+msgctxt "#30217"
+msgid "You are logged in as {}"
+msgstr "Ви увійшли як {}"
+
 # Plugin menu
 
 msgctxt "#30500"

@@ -324,6 +324,9 @@ def login():
     service.addon.setSetting('logged', 'true')
     service.set_session_status(SessionStatus.ACTIVE)
 
+    loc_str = service.addon.getLocalizedString(30217) # 'You are logged in as {}'
+    xbmcgui.Dialog().notification('Kyivstar.tv', loc_str.format(profile['userId']), xbmcgui.NOTIFICATION_INFO)
+
 @plugin.route('/logout')
 def logout():
     loc_str_1 = service.addon.getLocalizedString(30110) # 'Logout'

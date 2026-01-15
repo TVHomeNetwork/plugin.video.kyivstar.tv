@@ -347,6 +347,10 @@ msgctxt "#30216"
 msgid "Error getting stream url. Check your logs for details."
 msgstr ""
 
+msgctxt "#30217"
+msgid "You are logged in as {}"
+msgstr ""
+
 # Plugin menu
 
 msgctxt "#30500"
