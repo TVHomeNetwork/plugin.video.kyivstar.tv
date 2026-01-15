@@ -69,7 +69,9 @@
                         <dependency type="visible" setting="logged">false</dependency>
                     </dependencies>
                     <data>RunPlugin(plugin://plugin.video.kyivstar.tv/login)</data>
-                    <control type="button" format="action" />
+                    <control type="button" format="action">
+                        <close>true</close>
+                    </control>
                 </setting>
                 <setting id="locale" type="string" label="30024" help="-1">
                     <level>0</level>
