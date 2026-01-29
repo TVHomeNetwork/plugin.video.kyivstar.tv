@@ -107,24 +107,75 @@ class SaveManager():
         xbmc.log("KyivstarService: epg updating, next refresh date is %s" % self.epg_refresh_timer.strftime("%Y-%m-%d %H:%M:%S"), xbmc.LOGDEBUG)
         return 0
 
+    def _load_existing_epg_root(self):
+        if self.epg_path is None or not xbmcvfs.exists(self.epg_path):
+            return None
+        try:
+            f = xbmcvfs.File(self.epg_path)
+            existing_data = f.read()
+            f.close()
+            existing_root = etree.fromstring(existing_data)
+            if existing_root.tag == 'tv':
+                return existing_root
+        except Exception as e:
+            xbmc.log("KyivstarService: Failed to load existing EPG: %s" % str(e), xbmc.LOGERROR)
+        return None
+
     def check_epg(self, load = False):
         if load:
             xbmc.log("KyivstarService: Saving EPG started.", xbmc.LOGDEBUG)
 
             self.process_epg_path = self.epg_path
-            self.epg_xml_root = etree.Element("tv")
+            self.epg_xml_root = self._load_existing_epg_root()
+            if self.epg_xml_root is None:
+                self.epg_xml_root = etree.Element("tv")
             self.epg_channels = []
 
             channel_manager = ChannelManager()
             channel_manager.load(self.m3u_path)
 
+            xml_channels = { xml_channel.get('id') : xml_channel for xml_channel in self.epg_xml_root.findall(".//channel") }
+            for channel_id, xml_channel in xml_channels.items():
+                if channel_id in channel_manager.all and channel_manager.all[channel_id].enabled:
+                    continue
+                self.epg_xml_root.remove(xml_channel)
+                for xml_programme in self.epg_xml_root.findall(".//programme[@channel='%s']" % channel_id):
+                    self.epg_xml_root.remove(xml_programme)
+
             for channel in channel_manager.enabled:
-                xml_channel = etree.SubElement(self.epg_xml_root, "channel", attrib={"id": channel.id})
-                etree.SubElement(xml_channel, "display-name").text = channel.name
-                etree.SubElement(xml_channel, "icon", src=channel.logo)
+                if channel.id in xml_channels:
+                    xml_channel = xml_channels[channel.id]
+                    xml_channel.find("display-name").text = channel.name
+                    xml_channel.find("icon").set("src", channel.logo)
+                else:
+                    xml_channel = etree.SubElement(self.epg_xml_root, "channel", attrib={"id": channel.id})
+                    etree.SubElement(xml_channel, "display-name").text = channel.name
+                    etree.SubElement(xml_channel, "icon", src=channel.logo)
                 self.epg_channels.append(channel)
 
         return len(self.epg_channels) > 0
+
+    def _parse_time(self, time_str):
+        if not time_str:
+            return None
+        try:
+            return datetime.strptime(time_str, '%Y%m%d%H%M%S %z')
+        except Exception:
+            try:
+                return datetime.strptime(time_str, '%Y%m%d%H%M%S').replace(tzinfo=timezone.utc)
+            except Exception:
+                return None
+
+    def _group_programmes(self, programmes):
+        groups = {}
+        for p in programmes:
+            dt = self._parse_time(p.get("start"))
+            if dt is None:
+                groups.setdefault('removed', []).append(p)
+            else:
+                dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+                groups.setdefault(dt, []).append(p)
+        return groups
 
     def process_epg(self, service):
         session_id = service.addon.getSetting('session_id')
@@ -134,6 +185,28 @@ class SaveManager():
 
         if len(channels) > 0:
             channel = channels.pop(0)
+
+            programmes = xml_root.findall(".//programme[@channel='%s']" % channel.id)
+            day_programmes = self._group_programmes(programmes)
+            for p in day_programmes.pop('removed', []):
+                xml_root.remove(p)
+
+            try:
+                now = datetime.now(timezone.utc)
+            except Exception:
+                now = datetime.utcnow().replace(tzinfo=timezone.utc)
+            threshold = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=3)
+
+            to_remove = []
+            for day, programmes in day_programmes.items():
+                if day >= threshold:
+                    continue
+                for p in programmes:
+                    xml_root.remove(p)
+                to_remove.append(day)
+            for day in to_remove:
+                del day_programmes[day]
+
             epg_data = service.request.get_elem_epg_data(session_id, channel.id)
 
             if service.request.error:
@@ -154,6 +227,13 @@ class SaveManager():
 
             for epg_day_data in epg_data:
                 program_list = epg_day_data.get('programList', [])
+
+                if program_list:
+                    day_date = datetime.fromtimestamp(epg_day_data['date']/1000, tz=timezone.utc)
+                    day_date = day_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                    for p in day_programmes.get(day_date, []):
+                        xml_root.remove(p)
+
                 for program in program_list:
                     program_attrib = {
                         "start": datetime.fromtimestamp(program['start']/1000, tz=timezone.utc).strftime('%Y%m%d%H%M%S %z'),
