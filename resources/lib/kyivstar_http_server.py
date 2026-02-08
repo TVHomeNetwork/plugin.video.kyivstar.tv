@@ -6,6 +6,7 @@ import xbmc
 from urllib.parse import urlparse, parse_qs, unquote
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from resources.lib.kyivstar_stream_manager import KyivstarStreamManager
+from resources.lib.tasks import SetArchiveChannelsTask, ResetArchiveTask
 
 class HttpGetHandler(BaseHTTPRequestHandler):
     def handle_get_playlist(self, url_query):
@@ -116,9 +117,9 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 
         if command == 'load':
             channel_manager.reset()
-            channel_manager.load(service.save_manager.m3u_path)
+            channel_manager.load(service.m3u_path)
         elif command == 'save':
-            channel_manager.save(service.save_manager.m3u_path)
+            channel_manager.save(service.m3u_path)
 
             if service.addon.getSetting('iptv_sc_reload_when_m3u_saved') == 'true':
                 service.restart_iptv_simple()
@@ -154,7 +155,7 @@ class HttpGetHandler(BaseHTTPRequestHandler):
         channel_ids = query.get('channels', [])
 
         service = self.server.service
-        service.send_loop_event(set_archive_channels=channel_ids)
+        service.add_task(SetArchiveChannelsTask(channel_ids))
 
         return None, ''
 
@@ -169,7 +170,7 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 
     def handle_reset_archive(self):
         service = self.server.service
-        service.send_loop_event(reset_archive=True)
+        service.add_task(ResetArchiveTask())
 
         return None, ''
 
