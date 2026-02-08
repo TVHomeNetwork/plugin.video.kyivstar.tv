@@ -776,6 +776,8 @@ class ArchiveManager():
             cursor.execute("DROP TABLE IF EXISTS program_genres;")
             conn.commit()
             cursor.close()
+            self.channel_ids = None
+            self.program_ids = None
             self.vacuum()
             self.close()
             self.open(self.path)
