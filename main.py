@@ -996,9 +996,9 @@ def show_channel_manager():
     icon = service.addon.getAddonInfo('path') + '/resources/images/update-from-remote.png'
     li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
     url = plugin.url_for(send_command, command='download')
-    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+    xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
-    if service.save_manager.m3u_path is not None:
+    if service.m3u_path is not None:
         loc_str = service.addon.getLocalizedString(30505) # 'Load from file'
         li = xbmcgui.ListItem(label=loc_str)
         icon = service.addon.getAddonInfo('path') + '/resources/images/load-from-file.png'
@@ -1007,7 +1007,7 @@ def show_channel_manager():
         if channels['changed']:
             command = 'load_changed'
         url = plugin.url_for(send_command, command=command)
-        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
         format_str = '{}'
         if channels['changed']:
@@ -1017,7 +1017,7 @@ def show_channel_manager():
         icon = service.addon.getAddonInfo('path') + '/resources/images/save-to-file.png'
         li.setArt({'icon': icon, 'fanart': service.addon.getAddonInfo('fanart')})
         url = plugin.url_for(send_command, command='save')
-        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=True)
+        xbmcplugin.addDirectoryItem(handle, url, li, isFolder=False)
 
     for channel in channels['enabled']:
         li = xbmcgui.ListItem(label=channel['name'])
