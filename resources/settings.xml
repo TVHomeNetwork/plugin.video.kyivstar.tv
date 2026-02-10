@@ -146,6 +146,35 @@
                     <default>false</default>
                     <control type="toggle" />
                 </setting>
+                <setting id="m3u_refresh_enable" type="boolean" label="30043" help="-1">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="m3u_refresh_save" type="boolean" label="30044" help="-1">
+                    <level>0</level>
+                    <default>true</default>
+                    <dependencies>
+                        <dependency type="enable" setting="m3u_refresh_enable" operator="is">true</dependency>
+                    </dependencies>
+                    <control type="toggle" />
+                </setting>
+                <setting id="m3u_refresh_hour" type="integer" label="30017" help="-1">
+                    <level>0</level>
+                    <default>4</default>
+                    <constraints>
+                        <minimum>0</minimum>
+                        <step>1</step>
+                        <maximum>23</maximum>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="enable" setting="m3u_refresh_enable" operator="is">true</dependency>
+                    </dependencies>
+                    <control type="slider" format="integer">
+                        <popup>true</popup>
+                        <formatlabel>17998</formatlabel>
+                    </control>
+                </setting>
             </group>
         </category>
         <category id="epg" label="30013">

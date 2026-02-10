@@ -11,7 +11,7 @@ from resources.lib.kyivstar_request import KyivstarRequest
 from resources.lib.kyivstar_http_server import KyivstarHttpServer
 from resources.lib.channel_manager import ChannelManager
 from resources.lib.archive_manager import ArchiveManager
-from resources.lib.tasks import Task, TaskQueue, CheckSessionStatusTask, SaveM3UTask, SaveEPGTask, DailySaveEPGTask
+from resources.lib.tasks import Task, TaskQueue, CheckSessionStatusTask, SaveM3UTask, SaveEPGTask, DailySaveEPGTask, DailySaveM3UTask
 from resources.lib.common import strip_html, SessionStatus
 
 class KyivstarServiceMonitor(xbmc.Monitor):
@@ -216,8 +216,7 @@ class KyivstarService:
         self.check_session_status()
 
         self.add_task(DailySaveEPGTask())
-        if self.get_session_status() != SessionStatus.EMPTY and self.m3u_path and not xbmcvfs.exists(self.m3u_path):
-            self.add_task(SaveM3UTask(self.m3u_path))
+        self.add_task(DailySaveM3UTask())
 
         while not self.abort_requested:
             self.loop_event.wait(self.tasks.run_one(self))

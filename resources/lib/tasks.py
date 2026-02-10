@@ -203,10 +203,12 @@ class SetArchiveChannelsTask(Task):
         return 0
 
 class SaveM3UTask(Task):
-    def __init__(self, path, update=False, name="SaveM3UTask"):
+    def __init__(self, path, update=False, save=True, channel_manager=None, name="SaveM3UTask"):
         super(SaveM3UTask, self).__init__(name=name)
         self.path = path
         self.update = update
+        self.save = save
+        self.channel_manager = channel_manager
 
     def unique(self):
         return Task.SAVE_M3U
@@ -221,9 +223,10 @@ class SaveM3UTask(Task):
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
             return 0
 
-        channel_manager = ChannelManager()
+        channel_manager = self.channel_manager or ChannelManager()
 
         if self.update:
+            channel_manager.reset()
             channel_manager.load(self.path)
 
         if not channel_manager.download(service):
@@ -231,6 +234,14 @@ class SaveM3UTask(Task):
             xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_ERROR)
             service.set_session_status(SessionStatus.INACTIVE)
             return 0
+
+        if self.update and channel_manager.changed:
+            loc_str = service.addon.getLocalizedString(30218) # 'Channel updates: %s added, %s removed.'
+            loc_str = loc_str % (len(channel_manager.new), len(channel_manager.removed))
+            xbmcgui.Dialog().notification('Kyivstar.tv', loc_str, xbmcgui.NOTIFICATION_INFO)
+
+        if not self.save:
+            return 1
 
         temp = os.path.join(xbmcvfs.translatePath('special://temp'), 'temp.m3u')
 
@@ -443,6 +454,63 @@ class SaveEPGTask(Task):
 
     def finished(self):
         return self._finished_value
+
+class DailySaveM3UTask(Task):
+    def __init__(self, name="DailySaveM3UTask"):
+        super(DailySaveM3UTask, self).__init__(name=name)
+        self.refresh_timer = None
+
+    def unique(self):
+        return Task.SCHEDULED
+
+    def _run_internal(self, service):
+        if service.get_session_status() == SessionStatus.EMPTY:
+            return None
+
+        if service.m3u_path is None:
+            return None
+
+        task = service.tasks.get_unique_task(Task.SAVE_M3U)
+        if task and task.running():
+            return None
+
+        refresh_enable = service.addon.getSetting('m3u_refresh_enable') == 'true'
+        refresh_hour = int(service.addon.getSetting('m3u_refresh_hour'))
+        if not refresh_enable:
+            if self.refresh_timer is None:
+                if xbmcvfs.exists(service.m3u_path):
+                    st = xbmcvfs.Stat(service.m3u_path)
+                    self.refresh_timer = datetime.fromtimestamp(st.st_mtime())
+                else:
+                    service.tasks.add(SaveM3UTask(service.m3u_path))
+                    self.refresh_timer = datetime.now()
+                self.refresh_timer = self.refresh_timer.replace(hour=refresh_hour, minute=0, second=0, microsecond=0)
+                self.refresh_timer += timedelta(days=1)
+            return None
+
+        if self.refresh_timer and self.refresh_timer > datetime.now():
+            remaining = self.refresh_timer - datetime.now()
+            return max(0, int(remaining.total_seconds()))
+
+        if self.refresh_timer is None and xbmcvfs.exists(service.m3u_path):
+            st = xbmcvfs.Stat(service.m3u_path)
+            self.refresh_timer = datetime.fromtimestamp(st.st_mtime())
+            self.refresh_timer = self.refresh_timer.replace(hour=refresh_hour, minute=0, second=0, microsecond=0)
+            self.refresh_timer += timedelta(days=1)
+            remaining = self.refresh_timer - datetime.now()
+            return max(0, int(remaining.total_seconds()))
+
+        refresh_save = service.addon.getSetting('m3u_refresh_save') == 'true'
+        service.tasks.add(SaveM3UTask(service.m3u_path, update=True, save=refresh_save, channel_manager=service.channel_manager))
+        self.refresh_timer = datetime.now()
+        self.refresh_timer = self.refresh_timer.replace(hour=refresh_hour, minute=0, second=0, microsecond=0)
+        self.refresh_timer += timedelta(days=1)
+        xbmc.log("KyivstarService: m3u updating, next refresh date is %s" % self.refresh_timer.strftime("%Y-%m-%d %H:%M:%S"), xbmc.LOGDEBUG)
+        remaining = self.refresh_timer - datetime.now()
+        return max(0, int(remaining.total_seconds()))
+
+    def finished(self):
+        return False
 
 class DailySaveEPGTask(Task):
     def __init__(self, name="DailySaveEPGTask"):

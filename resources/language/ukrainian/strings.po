@@ -92,6 +92,14 @@ msgctxt "#30040"
 msgid "Autosave changes on exit"
 msgstr "Автоматичне збереження змін при виході"
 
+msgctxt "#30043"
+msgid "Enable automatic updates"
+msgstr "Увімкнути автоматичне оновлення"
+
+msgctxt "#30044"
+msgid "Save changes on every update"
+msgstr "Зберігати зміни під час кожного оновлення"
+
 # EPG category
 msgctxt "#30013"
 msgid "EPG"
@@ -350,6 +358,10 @@ msgstr "Помилка отримання URL-адреси потоку. Пер�
 msgctxt "#30217"
 msgid "You are logged in as {}"
 msgstr "Ви увійшли як {}"
+
+msgctxt "#30218"
+msgid "Channel updates: %s added, %s removed."
+msgstr "Оновлення каналів: %s додано, %s видалено."
 
 # Plugin menu
 

@@ -92,6 +92,14 @@ msgctxt "#30040"
 msgid "Autosave changes on exit"
 msgstr ""
 
+msgctxt "#30043"
+msgid "Enable automatic updates"
+msgstr ""
+
+msgctxt "#30044"
+msgid "Save changes on every update"
+msgstr ""
+
 # EPG category
 msgctxt "#30013"
 msgid "EPG"
@@ -349,6 +357,10 @@ msgstr ""
 
 msgctxt "#30217"
 msgid "You are logged in as {}"
+msgstr ""
+
+msgctxt "#30218"
+msgid "Channel updates: %s added, %s removed."
 msgstr ""
 
 # Plugin menu
