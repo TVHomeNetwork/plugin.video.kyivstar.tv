@@ -46,7 +46,7 @@ class Task(object):
             self._running_value = False
             duration = datetime.now() - self.start_time
             xbmc.log("KyivstarService: Task %s completed. Duration: %s" % (self.name, duration), xbmc.LOGDEBUG)
-        self._wait_timer = datetime.now() + timedelta(seconds=wait_time)
+        self._wait_timer = datetime.now() + timedelta(seconds=wait_time or 0)
         return wait_time
 
     def _run_internal(self, service):
