@@ -513,7 +513,9 @@ class ChannelState():
                     elif not stream.is_in_bound(start_date.timestamp()):
                         new_program_index = self.get_program_index(start_date)
                         next_program_index = self.get_next_program_index(program_index)
-                        if new_program_index == program_index or new_program_index == next_program_index:
+                        if not stream.finished:
+                            pass
+                        elif new_program_index == program_index or new_program_index == next_program_index:
                             program_index = next_program_index
                             self.media_sequence += len(stream.segments)
                             self.discontinuity_sequence += stream.get_discont_sequence(live)
