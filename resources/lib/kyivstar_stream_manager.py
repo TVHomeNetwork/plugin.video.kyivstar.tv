@@ -812,7 +812,10 @@ class KyivstarStreamManager():
         channel_state.last_access_time = datetime.now()
         self.check_active_states()
 
-        program_index = channel_state.get_program_index(date)
+        if channel_state.program_index is not None:
+            program_index = channel_state.program_index
+        else:
+            program_index = channel_state.get_program_index(datetime.now())
         if program_index is None and date is not None:
             return None
 
