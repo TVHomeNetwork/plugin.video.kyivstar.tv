@@ -816,8 +816,7 @@ class KyivstarStreamManager():
         if program_index is None and date is not None:
             return None
 
-        is_general = not channel_state.virtual
-        streams = channel_state.get_streams(program_index, force=is_general)
+        streams = channel_state.get_streams(program_index)
         if streams is None:
             return None
 
