@@ -408,139 +408,239 @@ class ChannelState():
 
         return streams[stream_id]
 
-    def update_timeline(self, stream_id, live, start_date, end_date, window_end_date):
+    class _TimelineContext:
+        OK = 'ok'
+        RETRY = 'retry'
+        ABORT = 'abort'
+
+        __slots__ = (
+            'stream_id',
+            'live',
+            'start_date',
+            'end_date',
+            'window_end_date',
+            'program_index',
+            'start_time',
+            'stream',
+            'need_correction',
+            'attempts',
+            'retries'
+        )
+
+        def __init__(self, stream_id, live, start_date, end_date, window_end_date):
+            self.stream_id = stream_id
+            self.live = live
+            self.start_date = start_date
+            self.end_date = end_date
+            self.window_end_date = window_end_date
+            self.program_index = None
+            self.start_time = 0
+            self.need_correction = False
+            self.stream = None
+            self.attempts = {}
+            self.retries = 2
+
+    def _resolve_program_index(self, ctx):
+        if not ctx.live:
+            if ctx.start_date is None:
+                return ctx.OK
+
+            ctx.program_index = self.get_program_index(ctx.start_date)
+            if ctx.program_index is None:
+                xbmc.log("KyivstarStreamManager _resolve_program_index: can't resolve program index for the start_date=%s" % ctx.start_date, xbmc.LOGERROR)
+                return ctx.ABORT
+            program = self.get_program(ctx.program_index)
+            ctx.start_time = (program['epg'] / 1000) if program else 0
+            return ctx.OK
+
         with self.lock:
-            program_index = self.program_index if live else None
-            start_time = self.start_time if live else 0
+            if self.program_index is None:
+                self.program_index = self.get_program_index(ctx.start_date)
+                if self.program_index is None:
+                    xbmc.log("KyivstarStreamManager _resolve_program_index: can't resolve program index for the start_date=%s" % ctx.start_date, xbmc.LOGERROR)
+                    return ctx.ABORT
+                program = self.get_program(self.program_index)
+                self.start_time = (program['epg'] / 1000) if program else time.time()
+                ctx.need_correction = not self.virtual
 
-        if start_date is not None and program_index is None:
-            program_index = self.get_program_index(start_date)
-            program = self.get_program(program_index)
-            start_time = program['epg']/1000 if program else 0
+            ctx.program_index = self.program_index
+            ctx.start_time = self.start_time
 
-        start_program_index = program_index
-        need_start_time_correction = False
+        return ctx.OK
 
-        if live:
+    def _load_stream_sync(self, ctx):
+        stream = ctx.stream
+        now = time.time()
+
+        result = self.service.request.send(stream.url, ret_json=False)
+
+        if not result.error:
+            stream.parse(result.value, result.url)
+            stream.set_last_update(now)
+            return ctx.OK
+
+        if result.recoverable:
+            return ctx.RETRY
+
+        if result.error.startswith(('400', '403')):
+            xbmc.log("KyivstarStreamManager _load_stream_sync: 400 or 403 error for %s, clearing cache" % str(ctx.program_index), xbmc.LOGWARNING)
             with self.lock:
-                if self.start_time == 0:
-                    self.start_time = start_time
-                    need_start_time_correction = not self.virtual
-                else:
-                    start_time = self.start_time
+                self.streams.pop(ctx.program_index, None)
+            attempt = ctx.attempts.get(ctx.program_index, 0)
+            if attempt < ctx.retries:
+                ctx.attempts[ctx.program_index] = attempt + 1
+                return ctx.RETRY
 
-        retried_programs = set()
+        xbmc.log("KyivstarStreamManager _load_stream_sync: fatal error: %s" % result.error, xbmc.LOGERROR)
+        return ctx.ABORT
+
+    def _correct_start_time(self, ctx):
+        stream = ctx.stream
+        if len(stream.segments) == 0:
+            return ctx.OK
+
+        now = time.time()
+        total_duration = stream.segments_end[-1]
+        real_start = now - total_duration
+
+        if real_start > ctx.start_date.timestamp():
+            prev_index = self.get_prev_program_index(ctx.program_index)
+            if prev_index is not None:
+                prev_program = self.get_program(prev_index)
+                prev_epg_start = (prev_program['epg'] / 1000) if prev_program else 0
+                corrected_start = prev_epg_start + real_start - ctx.start_time
+
+                with self.lock:
+                    self.program_index = prev_index
+                    self.start_time = corrected_start
+
+                ctx.program_index = prev_index
+                ctx.start_time = corrected_start
+                return ctx.RETRY
+        else:
+            with self.lock:
+                self.start_time = real_start
+            ctx.start_time = real_start
+
+        return ctx.OK
+
+    def _ensure_stream_ready(self, ctx):
+        stream = self.get_stream(ctx.stream_id, ctx.program_index)
+        if stream is None:
+            xbmc.log("KyivstarStreamManager _ensure_stream_ready: can't get stream %s for the program index %s" % (ctx.stream_id, ctx.program_index), xbmc.LOGERROR)
+            return ctx.ABORT
+
+        ctx.stream = stream
+        status = ctx.OK
+        if not stream.finished:
+            is_in_window = (ctx.start_time < ctx.window_end_date.timestamp() if ctx.window_end_date else True)
+
+            if len(stream.segments) == 0 and is_in_window:
+                status = self._load_stream_sync(ctx)
+                if status == ctx.OK and ctx.need_correction and ctx.start_date is not None:
+                    ctx.need_correction = False
+                    status = self._correct_start_time(ctx)
+            else:
+                with self.lock:
+                    is_queued = (ctx.program_index, ctx.stream_id) in self.pending_updates
+                    if not is_queued:
+                        self.pending_updates.add((ctx.program_index, ctx.stream_id))
+                if not is_queued:
+                    self.update_queue.put({
+                        'action': 'update_stream',
+                        'program_index': ctx.program_index,
+                        'stream_id': ctx.stream_id,
+                    })
+        elif ctx.live and ctx.end_date is not None:
+            prefetch_start = stream.get_end_time() - 2 * stream.target_duration
+            with self.lock:
+                is_cached = ctx.program_index in self.streams
+            if not is_cached and prefetch_start <= ctx.end_date.timestamp():
+                self.update_queue.put({
+                    'action': 'prefetch_program',
+                    'program_index': ctx.program_index,
+                })
+
+        if status == ctx.OK:
+            stream.set_start_time(ctx.start_time)
+        return status
+
+    def _advance_program_index(self, ctx):
+        with self.lock:
+            if self.program_index is None:
+                self.program_index = ctx.program_index
+                return ctx.OK
+
+        stream = ctx.stream
+        if stream.is_in_bound(ctx.start_date.timestamp()) or not stream.finished:
+            return ctx.OK
+
+        new_index = self.get_program_index(ctx.start_date)
+        if new_index is None:
+            xbmc.log("KyivstarStreamManager _advance_program_index: can't resolve program index for the start_date=%s" % ctx.start_date, xbmc.LOGERROR)
+            return ctx.ABORT
+
+        next_index = self.get_next_program_index(ctx.program_index)
+        if next_index is None:
+            xbmc.log("KyivstarStreamManager _advance_program_index: can't resolve next program index for the current program index=%s" % str(ctx.program_index), xbmc.LOGERROR)
+            return ctx.ABORT
+
+        with self.lock:
+            if new_index in (ctx.program_index, next_index):
+                self.media_sequence += len(stream.segments)
+                self.discontinuity_sequence += stream.get_discont_sequence(ctx.live)
+                self.start_time = stream.get_end_time()
+                ctx.program_index = next_index
+            else:
+                self.media_sequence = 0
+                self.discontinuity_sequence = 0
+                program = self.get_program(new_index)
+                self.start_time = (program['epg'] / 1000) if program else 0
+                ctx.program_index = new_index
+
+            self.program_index = ctx.program_index
+            ctx.start_time = self.start_time
+        return ctx.RETRY
+
+    def update_timeline(self, stream_id, live, start_date, end_date, window_end_date):
+        ctx = self._TimelineContext(stream_id, live, start_date, end_date, window_end_date)
+        if self._resolve_program_index(ctx) == ctx.ABORT:
+            return None
+
+        start_program_index = ctx.program_index
 
         while True:
-            stream = self.get_stream(stream_id, program_index)
-            if stream is None:
+            status = self._ensure_stream_ready(ctx)
+            if status == ctx.ABORT:
                 return None
+            elif status == ctx.RETRY:
+                start_program_index = ctx.program_index
+                ctx.start_date = None
+                continue
 
-            if not stream.finished:
-                now = time.time()
-                is_in_window = start_time < window_end_date.timestamp() if window_end_date else True
-                if len(stream.segments) == 0 and is_in_window:
-                    result = self.service.request.send(stream.url, ret_json=False)
-                    if not result.error:
-                        stream.parse(result.value, result.url)
-                        stream.set_last_update(now)
-                        if need_start_time_correction:
-                            if len(stream.segments) > 0:
-                                total_duration = stream.segments_end[-1]
-                                real_start_time = now - total_duration
-
-                                if real_start_time > start_date.timestamp():
-                                    prev_program_index = self.get_prev_program_index(program_index)
-                                    if prev_program_index is not None:
-                                        program_index = prev_program_index
-                                        start_program_index = prev_program_index
-                                        with self.lock:
-                                            self.program_index = prev_program_index
-
-                                        prev_program = self.get_program(prev_program_index)
-                                        prev_start_time = prev_program['epg']/1000 if prev_program else 0
-                                        prev_real_start_time = prev_start_time + real_start_time - start_time
-                                        
-                                        start_time = prev_real_start_time
-                                        with self.lock:
-                                            self.start_time = start_time
-
-                                        need_start_time_correction = False
-                                        continue
-                                else:
-                                    start_time = real_start_time
-                                    with self.lock:
-                                        self.start_time = start_time
-                            need_start_time_correction = False
-                    elif not result.recoverable:
-                        if result.error.startswith('403'):
-                            xbmc.log("KyivstarStreamManager update_timeline: 403 Forbidden for cached stream %s. Cleared cache." % str(program_index), xbmc.LOGWARNING)
-                            del self.streams[program_index]
-                            if program_index not in retried_programs:
-                                retried_programs.add(program_index)
-                                continue
-                        xbmc.log("KyivstarStreamManager update_timeline: %s" % result.error, xbmc.LOGERROR)
-                        return None
-                else:
-                    last_update = stream.get_last_update()
-                    with self.lock:
-                        is_queued = (program_index, stream_id) in self.pending_updates
-                    if not is_queued and (now - last_update >= stream.target_duration):
-                        with self.lock:
-                            self.pending_updates.add((program_index, stream_id))
-                        self.update_queue.put({ 'action': 'update_stream', 'program_index': program_index, 'stream_id': stream_id})
-
-            if stream.finished:
-                prefetch_start_time = stream.get_end_time() - 2 * stream.target_duration
-                can_prefetch = prefetch_start_time <= end_date.timestamp() if end_date else False
-                if can_prefetch:
-                    next_program_index = self.get_next_program_index(program_index)
-                    if next_program_index is not None:
-                        with self.lock:
-                            is_cached = next_program_index in self.streams
-                        if not is_cached:
-                            self.update_queue.put({ 'action': 'prefetch_program', 'program_index': next_program_index})
-
-            stream.set_start_time(start_time)
-
-            if end_date is None:
+            if ctx.end_date is None:
                 break
 
-            if start_date is not None:
-                with self.lock:
-                    if self.program_index is None:
-                        self.program_index = program_index
-                    elif not stream.is_in_bound(start_date.timestamp()):
-                        new_program_index = self.get_program_index(start_date)
-                        next_program_index = self.get_next_program_index(program_index)
-                        if not stream.finished:
-                            pass
-                        elif new_program_index == program_index or new_program_index == next_program_index:
-                            program_index = next_program_index
-                            self.media_sequence += len(stream.segments)
-                            self.discontinuity_sequence += stream.get_discont_sequence(live)
-                            self.start_time = stream.get_end_time()
-                        else:
-                            program_index = new_program_index
-                            self.media_sequence = 0
-                            self.discontinuity_sequence = 0
-                            program = self.get_program(program_index)
-                            self.start_time = program['epg']/1000 if program else 0
-                        self.program_index = program_index
-                        start_program_index = program_index
-                        start_time = self.start_time
-                        start_date = None
-                        continue
+            if ctx.start_date is not None:
+                status = self._advance_program_index(ctx)
+                if status == ctx.ABORT:
+                    return None
+                elif status == ctx.RETRY:
+                    start_program_index = ctx.program_index
+                    ctx.start_date = None
+                    continue
 
-            if stream.is_in_bound(end_date.timestamp()) or not stream.finished:
+            if ctx.stream.is_in_bound(ctx.end_date.timestamp()) or not ctx.stream.finished:
                 break
 
-            program_index = self.get_next_program_index(program_index)
-            if program_index is None:
+            next_index = self.get_next_program_index(ctx.program_index)
+            if next_index is None:
                 break
 
-            start_time = stream.get_end_time()
-            start_date = None
+            ctx.start_time = ctx.stream.get_end_time()
+            ctx.program_index = next_index
+            ctx.start_date = None
+
         return start_program_index
 
     def get_next_program_index(self, program_index):
