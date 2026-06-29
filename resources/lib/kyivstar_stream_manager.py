@@ -643,21 +643,34 @@ class ChannelState():
 
         return start_program_index
 
-    def get_next_program_index(self, program_index):
+    def get_next_program_index(self, program_index, allow_fetch=True):
         if program_index is None:
             return None
         date_index = program_index[0]
         index = program_index[1] + 1
 
-        program_list = self.get_program_list(date_index)
+        if allow_fetch:
+            program_list = self.get_program_list(date_index)
+        else:
+            with self.lock:
+                program_list = self.program_list.get(date_index)
+
+        if not program_list:
+            return None
+
         if index < len(program_list):
             return (date_index, index)
 
         date_index += timedelta(days=1)
         index = 0
 
-        program_list = self.get_program_list(date_index)
-        if index < len(program_list):
+        if allow_fetch:
+            program_list = self.get_program_list(date_index)
+        else:
+            with self.lock:
+                program_list = self.program_list.get(date_index)
+
+        if program_list and index < len(program_list):
             return (date_index, index)
 
         return None
