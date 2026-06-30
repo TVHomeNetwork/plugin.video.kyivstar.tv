@@ -5,6 +5,7 @@ import time
 
 import xbmc
 
+from abc import ABC, abstractmethod
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
@@ -162,6 +163,101 @@ class Stream():
             index = bisect.bisect(self.segments_start, cur_time) - 1
             return max(0, min(index, len(self.segments) - 1))
 
+class ChannelTask(ABC):
+    def __init__(self, channel_state):
+        self.state = channel_state
+
+    @property
+    @abstractmethod
+    def task_key(self):
+        pass
+
+    @abstractmethod
+    def execute(self):
+        pass
+
+class UpdateStreamTask(ChannelTask):
+    def __init__(self, channel_state, program_index, stream_id):
+        super().__init__(channel_state)
+        self.program_index = program_index
+        self.stream_id = stream_id
+        self._task_key = ("update_stream", self.program_index, self.stream_id)
+        self.execute_at = 0.0
+        self.retries = 2
+
+    @property
+    def task_key(self):
+        return self._task_key
+
+    def execute(self):
+        program_index = self.program_index
+        stream_id = self.stream_id
+
+        if self.retries == 0:
+            return True
+
+        stream = self.state.get_stream(stream_id, program_index)
+
+        if stream is None:
+            xbmc.log("KyivstarStreamManager UpdateStreamTask: the stream with the id %s is not found for the program index %s of the asset %s" % (stream_id, program_index, self.state.asset_id), xbmc.LOGERROR)
+            return True
+
+        result = self.state.service.request.send(stream.url, ret_json=False)
+        if not result.error:
+            stream.parse(result.value, result.url)
+            stream.set_last_update(time.time())
+            return True
+        elif not result.recoverable and result.error.startswith(('400', '403')):
+            self.state.get_streams(program_index, force=True)
+            xbmc.log("KyivstarStreamManager UpdateStreamTask: 400 or 403 error for %s, clearing cache." % str(program_index), xbmc.LOGWARNING)
+        else:
+            xbmc.log("KyivstarStreamManager UpdateStreamTask: error for asset %s: %s" % (self.state.asset_id, result.error), xbmc.LOGERROR)
+        self.retries -= 1
+        self.execute_at = time.time() + 1
+        return False
+
+class PrefetchProgramsTask(ChannelTask):
+    def __init__(self, channel_state, program_index, count, update):
+        super().__init__(channel_state)
+        self.program_index = program_index
+        self.count = count
+        self.update = update
+        self._task_key = ("prefetch_programs", self.program_index, self.update)
+
+    @property
+    def task_key(self):
+        return self._task_key
+
+    def execute(self):
+        with self.state.lock:
+            is_cached = self.program_index in self.state.streams
+        if self.update or not is_cached:
+            self.state.get_streams(self.program_index, force=self.update)
+
+        next_index = None
+        next_count = self.count
+
+        if self.count > 0:
+            next_index = self.state.get_next_program_index(self.program_index)
+            next_count -= 1
+        elif self.count < 0:
+            next_index = self.state.get_prev_program_index(self.program_index)
+            next_count += 1
+
+        if next_index:
+            next_task = PrefetchProgramsTask(
+                channel_state=self.state,
+                program_index=next_index,
+                count=next_count,
+                update=self.update
+            )
+
+            with self.state.lock:
+                is_cached = next_index in self.state.streams
+            if self.update or not is_cached:
+                self.state.add_task(next_task)
+        return True
+
 class ChannelState():
     def __init__(self, service, asset_id, virtual):
         self.service = service
@@ -189,71 +285,72 @@ class ChannelState():
         self.worker_thread = threading.Thread(target=self._update_worker)
         self.worker_thread.start()
 
+    def add_task(self, task):
+        if not isinstance(task, ChannelTask):
+            xbmc.log("KyivstarStreamManager add_task: received invalid task type %s" % type(task), xbmc.LOGWARNING)
+            return
+
+        key = task.task_key
+        with self.lock:
+            is_queued = key in self.pending_updates
+            if not is_queued:
+                self.pending_updates.add(key)
+        if not is_queued:
+            self.update_queue.put(task)
+
     def _update_worker(self):
+        periodic_tasks = []
+
         while True:
-            task = self.update_queue.get()
+            now = time.time()
+            timeout = None
+
+            if periodic_tasks:
+                periodic_tasks.sort(key=lambda t: t.execute_at, reverse=True)
+                closest_task = periodic_tasks[-1]
+                timeout = max(0.0, closest_task.execute_at - now)
+
+            try:
+                task = self.update_queue.get(timeout=timeout)
+            except queue.Empty:
+                task = periodic_tasks[-1]
 
             if task is None:
-                self.update_queue.task_done()
+                periodic_tasks.clear()
+                with self.lock:
+                    self.pending_updates = set()
+                if hasattr(self, 'update_queue'):
+                    self.update_queue.task_done()
                 break
 
-            if not isinstance(task, dict):
-                xbmc.log("KyivstarStreamManager _update_worker: received invalid task %s" % str(task), xbmc.LOGWARNING)
+            if not isinstance(task, ChannelTask):
+                xbmc.log("KyivstarStreamManager _update_worker: received invalid task type %s" % type(task), xbmc.LOGWARNING)
                 self.update_queue.task_done()
                 continue
 
-            if task.get('action') == 'stop':
-                self.update_queue.task_done()
-                break
+            key = task.task_key
+            is_queued = (task not in periodic_tasks)
 
-            if task.get('action') == 'update_stream':
-                program_index = task.get('program_index')
-                stream_id = task.get('stream_id')
+            try:
+                is_finished = task.execute()
 
-                try:
-                    retries = 2
-
-                    for attempt in range(retries):
-                        stream = self.get_stream(stream_id, program_index)
-
-                        if stream is None:
-                            xbmc.log("KyivstarStreamManager _update_worker: the stream with the id %s is not found for the program index %s of the asset %s" % (stream_id, program_index, self.asset_id), xbmc.LOGERROR)
-                            break
-
-                        result = self.service.request.send(stream.url, ret_json=False)
-                        if not result.error:
-                            stream.parse(result.value, result.url)
-                            stream.set_last_update(time.time())
-                            break
-                        elif not result.recoverable and result.error.startswith('403'):
-                            with self.lock:
-                                del self.streams[program_index]
-                            xbmc.log("KyivstarStreamManager _update_worker: 403 Forbidden for cached stream %s. Cleared cache." % str(program_index), xbmc.LOGWARNING)
-                        else:
-                            xbmc.log("KyivstarStreamManager _update_worker: error for asset %s: %s" % (self.asset_id, result.error), xbmc.LOGERROR)
-                        xbmc.sleep(1)
-                except Exception as e:
-                    xbmc.log("KyivstarStreamManager _update_worker: stream update exception: %s" % str(e), xbmc.LOGERROR)
-                finally:
-                    with self.lock:
-                        self.pending_updates.discard((program_index, stream_id))
+                if not is_finished and is_queued:
+                    periodic_tasks.append(task)
+                    is_queued = False
                     self.update_queue.task_done()
-
-            elif task.get('action') == 'prefetch_program':
-                program_index = task.get('program_index')
-
-                try:
+                elif is_finished and not is_queued:
                     with self.lock:
-                        is_cached = program_index in self.streams
-                    if not is_cached:
-                        self.get_streams(program_index)
-                except Exception as e:
-                    xbmc.log("KyivstarStreamManager _update_worker: prefetch exception: %s" % str(e), xbmc.LOGERROR)
-                finally:
+                        self.pending_updates.discard(key)
+            except Exception as e:
+                xbmc.log("KyivstarStreamManager _update_worker: Error executing task %s: %s" % (key, str(e)), xbmc.LOGERROR)
+            finally:
+                if is_queued:
+                    with self.lock:
+                        self.pending_updates.discard(key)
                     self.update_queue.task_done()
 
     def stop(self):
-        self.update_queue.put({ 'action': 'stop' })
+        self.update_queue.put(None)
         if self.worker_thread.is_alive():
             self.worker_thread.join(timeout=3.0)
 
@@ -541,25 +638,27 @@ class ChannelState():
                     ctx.need_correction = False
                     status = self._correct_start_time(ctx)
             else:
-                with self.lock:
-                    is_queued = (ctx.program_index, ctx.stream_id) in self.pending_updates
-                    if not is_queued:
-                        self.pending_updates.add((ctx.program_index, ctx.stream_id))
-                if not is_queued:
-                    self.update_queue.put({
-                        'action': 'update_stream',
-                        'program_index': ctx.program_index,
-                        'stream_id': ctx.stream_id,
-                    })
+                self.add_task(UpdateStreamTask(
+                    channel_state=self,
+                    program_index=ctx.program_index,
+                    stream_id=ctx.stream_id
+                ))
         elif ctx.live and ctx.end_date is not None:
-            prefetch_start = stream.get_end_time() - 2 * stream.target_duration
+            stream_end_time = stream.get_end_time()
+            cache_end_time = ctx.end_date.timestamp()
+            prefetch_start = stream_end_time - 2 * stream.target_duration
+            next_index = self.get_next_program_index(ctx.program_index, allow_fetch=False)
+
             with self.lock:
                 is_cached = ctx.program_index in self.streams
-            if not is_cached and prefetch_start <= ctx.end_date.timestamp():
-                self.update_queue.put({
-                    'action': 'prefetch_program',
-                    'program_index': ctx.program_index,
-                })
+                is_next_cached = next_index in self.streams if next_index else False
+                if prefetch_start <= cache_end_time < stream_end_time and not (is_cached and is_next_cached):
+                    self.add_task(PrefetchProgramsTask(
+                        channel_state=self,
+                        program_index=ctx.program_index,
+                        count=1,
+                        update=False
+                    ))
 
         if status == ctx.OK:
             stream.set_start_time(ctx.start_time)
