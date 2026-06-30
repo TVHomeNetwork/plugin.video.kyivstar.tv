@@ -176,6 +176,22 @@ class ChannelTask(ABC):
     def execute(self):
         pass
 
+class KeepAliveTask(ChannelTask):
+    def __init__(self, channel_state, playlist_url):
+        super().__init__(channel_state)
+        self.keepalive_url = urljoin(playlist_url + '/', 'keepalive')
+        self._task_key = ("keepalive", playlist_url)
+        self.execute_at = 0.0
+
+    @property
+    def task_key(self):
+        return self._task_key
+
+    def execute(self):
+        self.state.service.request.send(self.keepalive_url, ret_json=False)
+        self.execute_at = time.time() + 30
+        return False
+
 class UpdateStreamTask(ChannelTask):
     def __init__(self, channel_state, program_index, stream_id):
         super().__init__(channel_state)
@@ -634,6 +650,11 @@ class ChannelState():
 
             if len(stream.segments) == 0 and is_in_window:
                 status = self._load_stream_sync(ctx)
+                if status == ctx.OK and not self.virtual and not stream.finished:
+                    self.add_task(KeepAliveTask(
+                        channel_state=self,
+                        playlist_url=stream.playlist_url
+                    ))
                 if status == ctx.OK and ctx.need_correction and ctx.start_date is not None:
                     ctx.need_correction = False
                     status = self._correct_start_time(ctx)
