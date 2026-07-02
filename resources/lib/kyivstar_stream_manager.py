@@ -1006,10 +1006,14 @@ class KyivstarStreamManager():
 
     def check_active_states(self):
         outdated_states = []
-        time_limit = datetime.now() - timedelta(minutes=30)
+        now = datetime.now()
+        virtual_time_limit = now - timedelta(minutes=30)
+        regular_time_limit = now - timedelta(minutes=2)
+
         with self.lock:
             for asset_id in self.channel_states:
                 channel_state = self.channel_states[asset_id]
+                time_limit = virtual_time_limit if channel_state.virtual else regular_time_limit
                 if channel_state.last_access_time < time_limit:
                     outdated_states.append(asset_id)
 
