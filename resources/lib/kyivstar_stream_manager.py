@@ -10,6 +10,8 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 
+from resources.lib.kyivstar_request import RequestResult
+
 class Stream():
     def __init__(self, url, playlist_url, bandwidth=None, resolution=None, stream_inf=None):
         self.playlist_url = playlist_url
@@ -464,7 +466,7 @@ class ChannelState():
             return None
         return program_list[index]
 
-    def get_streams(self, program_index, force=False):
+    def get_streams(self, program_index, force=False, request_result=None):
         with self.lock:
             if program_index in self.streams and not force:
                 return self.streams[program_index]
@@ -477,10 +479,18 @@ class ChannelState():
             result = self.service.request.get_elem_playback_stream_url(user_id, session_id, self.asset_id, date=epg)
         else:
             result = self.service.request.get_elem_stream_url(user_id, session_id, self.asset_id, virtual=self.virtual, date=epg)
+        if isinstance(request_result, RequestResult):
+            request_result.error = result.error
+            request_result.recoverable = result.recoverable
+            request_result.url = result.url
         if result.error and result.error.startswith('Pin code is required'):
             self.service.addon.setSetting('adult_content_enabled', 'true')
             return {}
         result = self.service.request.send(result.value, ret_json=False)
+        if isinstance(request_result, RequestResult):
+            request_result.error = result.error
+            request_result.recoverable = result.recoverable
+            request_result.url = result.url
         text = result.value
         url = result.url
         if result.error or text is None:
@@ -639,11 +649,37 @@ class ChannelState():
 
         return ctx.OK
 
+    def _check_streams(self, ctx):
+        with self.lock:
+            if ctx.program_index in self.streams:
+                return ctx.ABORT
+
+        result = RequestResult(None)
+        streams = self.get_streams(ctx.program_index, request_result=result)
+        if streams:
+            return ctx.RETRY
+
+        if result.error and result.recoverable:
+            xbmc.sleep(1000)
+            return ctx.RETRY
+
+        if result.error and result.error.startswith(('400', '404')):
+            xbmc.log("KyivstarStreamManager _check_streams: 400 or 403 error for %s, clearing cache" % str(ctx.program_index), xbmc.LOGWARNING)
+            with self.lock:
+                self.streams.pop(ctx.program_index, None)
+            attempt = ctx.attempts.get(ctx.program_index, 0)
+            if attempt < ctx.retries:
+                ctx.attempts[ctx.program_index] = attempt + 1
+                xbmc.sleep(1000)
+                return ctx.RETRY
+
+        xbmc.log("KyivstarStreamManager _check_streams: can't get streams for the program index %s" % str(ctx.program_index), xbmc.LOGERROR)
+        return ctx.ABORT
+
     def _ensure_stream_ready(self, ctx):
         stream = self.get_stream(ctx.stream_id, ctx.program_index)
         if stream is None:
-            xbmc.log("KyivstarStreamManager _ensure_stream_ready: can't get stream %s for the program index %s" % (ctx.stream_id, ctx.program_index), xbmc.LOGERROR)
-            return ctx.ABORT
+            return self._check_streams(ctx)
 
         ctx.stream = stream
         status = ctx.OK
