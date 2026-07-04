@@ -506,10 +506,12 @@ class ChannelState():
     def get_stream(self, stream_id, program_index):
         streams = self.get_streams(program_index)
         if streams is None:
+            xbmc.log("KyivstarStreamManager get_stream: can't load streams for the program index %s of the asset %s" % (program_index, self.asset_id), xbmc.LOGERROR)
             return None
 
         if stream_id not in streams:
             if stream_id not in self.stream_ids:
+                xbmc.log("KyivstarStreamManager get_stream: the stream id %s is not found in the stream ids for the asset %s" % (stream_id, self.asset_id), xbmc.LOGERROR)
                 return None
             for i in self.stream_ids[stream_id]['alternates']:
                 if i in streams:
@@ -907,7 +909,6 @@ class SegmentCacheManager():
             else:
                 wait_time = 0.5
 
-            event = None
             with self.lock:
                 self.process_key = None
                 cache_entry = self.cache.get(key)
@@ -937,6 +938,7 @@ class SegmentCacheManager():
         with self.lock:
             cache_entry = self.cache.get(key)
             if not cache_entry:
+                xbmc.log("KyivstarStreamManager SegmentCacheManager.get: the key %s is not in cache" % str(key), xbmc.LOGERROR)
                 return None
 
             content = cache_entry["content"]
