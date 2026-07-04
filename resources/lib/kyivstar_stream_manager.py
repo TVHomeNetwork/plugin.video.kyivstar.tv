@@ -646,9 +646,12 @@ class ChannelState():
         ctx.stream = stream
         status = ctx.OK
         if not stream.finished:
-            is_in_window = (ctx.start_time < ctx.window_end_date.timestamp() if ctx.window_end_date else True)
+            is_need_sync_update = True
+            if ctx.window_end_date:
+                window_end_time = ctx.window_end_date.timestamp()
+                is_need_sync_update = ctx.start_time < window_end_time and not stream.is_in_bound(window_end_time)
 
-            if len(stream.segments) == 0 and is_in_window:
+            if is_need_sync_update:
                 status = self._load_stream_sync(ctx)
                 if status == ctx.OK and not self.virtual and not stream.finished:
                     self.add_task(KeepAliveTask(
