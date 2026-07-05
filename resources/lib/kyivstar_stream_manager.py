@@ -1075,6 +1075,44 @@ class KyivstarStreamManager():
 
         self.segment_cache.stop()
 
+    _STREAM_INFOS = [
+        {
+            'resolution' : '1024x576',
+            'bandwidth' : '1300000',
+            'stream_inf' : '#EXT-X-STREAM-INF:BANDWIDTH=1300000,RESOLUTION=1024x576'
+        },
+        {
+            'resolution' : '1920x1080',
+            'bandwidth' : '3500000',
+            'stream_inf' : '#EXT-X-STREAM-INF:BANDWIDTH=3500000,RESOLUTION=1920x1080'
+        },
+        {
+            'resolution' : '1920x1080',
+            'bandwidth' : '5500000',
+            'stream_inf' : '#EXT-X-STREAM-INF:BANDWIDTH=5500000,RESOLUTION=1920x1080'
+        },
+        {
+            'resolution' : '640x360',
+            'bandwidth' : '461000',
+            'stream_inf' : '#EXT-X-STREAM-INF:BANDWIDTH=461000,RESOLUTION=640x360'
+        },
+        {
+            'resolution' : '854x480',
+            'bandwidth' : '1728000',
+            'stream_inf' : '#EXT-X-STREAM-INF:BANDWIDTH=1728000,RESOLUTION=854x480'
+        },
+        {
+            'resolution' : '1280x720',
+            'bandwidth' : '4660000',
+            'stream_inf' : '#EXT-X-STREAM-INF:BANDWIDTH=4660000,RESOLUTION=1280x720'
+        },
+        {
+            'resolution' : '1920x1080',
+            'bandwidth' : '7960000',
+            'stream_inf' : '#EXT-X-STREAM-INF:BANDWIDTH=7960000,RESOLUTION=1920x1080'
+        }
+    ]
+
     def get_playlist_content(self, asset_id, virtual, epg):
         if epg is None:
             date = datetime.now()
@@ -1104,8 +1142,21 @@ class KyivstarStreamManager():
             return None
 
         streams = channel_state.get_streams(program_index)
-        if streams is None:
-            return None
+        if not streams:
+            streams = {}
+            with channel_state.lock:
+                if channel_state.stream_ids:
+                    for id in channel_state.stream_ids:
+                        stream_info = channel_state.stream_ids[id]
+                        resolution = stream_info['resolution']
+                        bandwidth = stream_info['bandwidth']
+                        stream_inf = '#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s' % (bandwidth, resolution)
+                        streams[id] = type('MockStream', (object,), { 'stream_inf' : stream_inf })()
+                else:
+                    for stream_info in self._STREAM_INFOS:
+                        stream = type('MockStream', (object,), stream_info)()
+                        streams[channel_state.get_stream_id(stream)] = stream
+
 
         server_address = self.server.server_address
         base_url = f"http://{server_address[0]}:{server_address[1]}/chunklist.m3u8"
