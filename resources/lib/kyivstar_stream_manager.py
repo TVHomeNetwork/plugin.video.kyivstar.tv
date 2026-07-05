@@ -911,6 +911,7 @@ class SegmentCacheManager():
         self.queue_event = threading.Event()
         self.abort_event = threading.Event()
         self.lock = threading.Lock()
+        self.process_error_handler = None
 
     def process(self):
         wait_time = None
@@ -940,6 +941,8 @@ class SegmentCacheManager():
             if result.error:
                 xbmc.log("KyivstarStreamManager SegmentCacheManager.process: %s" % result.error, xbmc.LOGERROR)
                 content = None
+                if self.process_error_handler:
+                    self.process_error_handler(key[0], key[1], key[2], key[3], result)
             if result.error and wait_time is not None:
                 wait_time = min(wait_time + 0.5, 10)
             else:
@@ -969,8 +972,8 @@ class SegmentCacheManager():
         self.process_thread = None
         self.clear()
 
-    def get(self, asset_id, segment_id):
-        key = (asset_id, segment_id)
+    def get(self, asset_id, stream_id, segment_id, epg):
+        key = (asset_id, stream_id, segment_id, epg)
         with self.lock:
             cache_entry = self.cache.get(key)
             if not cache_entry:
@@ -996,11 +999,11 @@ class SegmentCacheManager():
                 return None
             return cache_entry["content"]
 
-    def update(self, asset_id, cache_list):
+    def update(self, asset_id, stream_id, epg, cache_list):
         with self.lock:
             valid_keys = set()
             for segment_id, url in cache_list:
-                key = (asset_id, segment_id)
+                key = (asset_id, stream_id, segment_id, epg)
                 valid_keys.add(key)
                 cache_entry = self.cache.get(key)
                 if not cache_entry:
@@ -1042,6 +1045,7 @@ class KyivstarStreamManager():
         self.channel_states = {}
         self.window_length = 60
         self.segment_cache = SegmentCacheManager(self.service)
+        self.segment_cache.process_error_handler = self.segment_cache_process_error_handler
         self.segment_cache.start()
         self.lock = threading.RLock()
 
@@ -1226,7 +1230,7 @@ class KyivstarStreamManager():
 
         cache_list = [ (start_time, segment["url"]) for _, segment, start_time in channel_state.get_stream_segments(stream_id, program_index, live, start_date, end_date) if segment["url"]]
 
-        queue_size, cache_size = self.segment_cache.update(asset_id, cache_list)
+        queue_size, cache_size = self.segment_cache.update(asset_id, stream_id, epg, cache_list)
         if stream.target_duration > 0:
             calc_cache_size = cache_size_setting // stream.target_duration
             if calc_cache_size > cache_size:
@@ -1234,4 +1238,36 @@ class KyivstarStreamManager():
                 cache_size = calc_cache_size
         self.service.update_cache_overlay(queue_size, cache_size)
 
-        return self.segment_cache.get(asset_id, segment_id)
+        return self.segment_cache.get(asset_id, stream_id, segment_id, epg)
+
+    def segment_cache_process_error_handler(self, asset_id, stream_id, segment_id, epg, result):
+        if result.recoverable or not result.error.startswith(('400', '403')):
+            return
+
+        live = False
+        if epg is None:
+            date = datetime.now()
+            live = True
+        elif epg < 0:
+            date = None
+        else:
+            date = datetime.fromtimestamp(epg/1000)
+
+        with self.lock:
+            channel_state = self.channel_states.get(asset_id)
+        if channel_state is None:
+            xbmc.log("KyivstarStreamManager segment_cache_process_error_handler: the asset %s has no channel state" % asset_id, xbmc.LOGERROR)
+            return
+
+        if live:
+            program_index = channel_state.program_index
+        else:
+            program_index = channel_state.get_program_index(date)
+        if program_index is None and date is not None:
+            return
+
+        channel_state.add_task(UpdateStreamTask(
+            channel_state=channel_state,
+            program_index=program_index,
+            stream_id=stream_id
+        ))
