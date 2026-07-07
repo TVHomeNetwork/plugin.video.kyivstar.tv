@@ -299,6 +299,7 @@ class ChannelState():
         self.lock = threading.RLock()
         self.update_queue = queue.Queue()
         self.pending_updates = set()
+        self.abort_event = threading.Event()
 
         self.worker_thread = threading.Thread(target=self._update_worker)
         self.worker_thread.start()
@@ -319,7 +320,7 @@ class ChannelState():
     def _update_worker(self):
         periodic_tasks = []
 
-        while True:
+        while not self.abort_event.is_set():
             now = time.time()
             timeout = None
 
@@ -369,6 +370,7 @@ class ChannelState():
 
     def stop(self):
         self.update_queue.put(None)
+        self.abort_event.set()
         if self.worker_thread.is_alive():
             self.worker_thread.join(timeout=3.0)
 
@@ -770,7 +772,7 @@ class ChannelState():
 
         start_program_index = ctx.program_index
 
-        while True:
+        while not self.abort_event.is_set():
             status = self._ensure_stream_ready(ctx)
             if status == ctx.ABORT:
                 return None
@@ -857,7 +859,7 @@ class ChannelState():
             media_sequence = self.media_sequence if live else 0
             start_time = self.start_time if live else 0
 
-        while True:
+        while not self.abort_event.is_set():
             stream = self.get_stream(stream_id, program_index)
             if stream is None:
                 break
