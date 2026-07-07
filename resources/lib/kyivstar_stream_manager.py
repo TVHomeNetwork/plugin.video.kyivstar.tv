@@ -1244,7 +1244,7 @@ class KyivstarStreamManager():
             else:
                 text += segment['url'] + '\n'
 
-        if not live:
+        if not live and stream.finished:
             text += '#EXT-X-ENDLIST\n'
 
         return text
