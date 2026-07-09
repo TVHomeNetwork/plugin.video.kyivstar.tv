@@ -16,11 +16,14 @@ class Stream():
     def __init__(self, url, playlist_url, bandwidth=None, resolution=None, stream_inf=None):
         self.playlist_url = playlist_url
         if stream_inf is not None:
-            for pair in stream_inf[18:].split(','):
-                if pair.startswith('BANDWIDTH'):
-                    bandwidth = pair.split('=')[1]
-                elif pair.startswith('RESOLUTION'):
-                    resolution = pair.split('=')[1]
+            _, _, params_str = stream_inf.partition(':')
+            for pair in params_str.split(','):
+                key, _, value = pair.partition('=')
+                key = key.strip()
+                if key == 'BANDWIDTH':
+                    bandwidth = value.strip('" ')
+                elif key == 'RESOLUTION':
+                    resolution = value.strip('" ')
         self.stream_inf = stream_inf
         self.url = url
         self.bandwidth = bandwidth
@@ -63,7 +66,11 @@ class Stream():
         segment_discontinuity = False
         for line in lines:
             if line.startswith('#EXT-X-TARGETDURATION:'):
-                target_duration = int(line[22:])
+                _, _, value = line.partition(':')
+                try:
+                    target_duration = int(value.strip())
+                except ValueError:
+                    target_duration = 10
             elif line == '#EXT-X-DISCONTINUITY':
                 segment_tags.append(line)
                 segment_discontinuity = True
@@ -75,7 +82,12 @@ class Stream():
                 segment_discontinuity = False
             elif line.startswith('#EXTINF:'):
                 segment_tags.append(line)
-                segment_duration = float(line[8:len(line)-1])
+                _, _, params_str = line.partition(':')
+                value, _, _ = params_str.partition(',')
+                try:
+                    segment_duration = float(value.strip())
+                except ValueError:
+                    segment_duration = 0.0
             elif len(line) > 0 and not line.startswith('#'):
                 if not line.startswith('https://'):
                     line = urljoin(base_url, line)
