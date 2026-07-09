@@ -1139,13 +1139,15 @@ class KyivstarStreamManager():
         }
     ]
 
-    def get_playlist_content(self, asset_id, virtual, epg):
+    def _epg_to_datetime(self, epg):
         if epg is None:
-            date = datetime.now()
-        elif epg < 0:
-            date = None
-        else:
-            date = datetime.fromtimestamp(epg/1000)
+            return datetime.now(), True
+        if epg < 0:
+            return None, False
+        return datetime.fromtimestamp(epg / 1000), False
+
+    def get_playlist_content(self, asset_id, virtual, epg):
+        date, _ = self._epg_to_datetime(epg)
 
         with self.lock:
             if self.service.drop_channel_states:
@@ -1190,14 +1192,7 @@ class KyivstarStreamManager():
         return text
 
     def get_chunklist_content(self, asset_id, stream_id, epg=None):
-        live = False
-        if epg is None:
-            date = datetime.now()
-            live = True
-        elif epg < 0:
-            date = None
-        else:
-            date = datetime.fromtimestamp(epg/1000)
+        date, live = self._epg_to_datetime(epg)
 
         with self.lock:
             channel_state = self.channel_states.get(asset_id)
@@ -1270,14 +1265,7 @@ class KyivstarStreamManager():
         return text
 
     def get_segment_content(self, asset_id, stream_id, segment_id, epg):
-        live = False
-        if epg is None:
-            date = datetime.now()
-            live = True
-        elif epg < 0:
-            date = None
-        else:
-            date = datetime.fromtimestamp(epg/1000)
+        date, live = self._epg_to_datetime(epg)
 
         with self.lock:
             channel_state = self.channel_states.get(asset_id)
@@ -1317,14 +1305,7 @@ class KyivstarStreamManager():
         if result.recoverable or not result.error.startswith(('400', '403')):
             return
 
-        live = False
-        if epg is None:
-            date = datetime.now()
-            live = True
-        elif epg < 0:
-            date = None
-        else:
-            date = datetime.fromtimestamp(epg/1000)
+        date, live = self._epg_to_datetime(epg)
 
         with self.lock:
             channel_state = self.channel_states.get(asset_id)
