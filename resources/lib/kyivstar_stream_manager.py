@@ -6,7 +6,7 @@ import time
 import xbmc
 
 from abc import ABC, abstractmethod
-from collections import deque
+from collections import deque, namedtuple
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 
@@ -1040,6 +1040,8 @@ class SegmentCacheManager():
             self.queue_set.clear()
             self.process_key = None
 
+MockStream = namedtuple('MockStream', ['stream_inf', 'resolution', 'bandwidth'])
+
 class KyivstarStreamManager():
     def __init__(self, server):
         self.server = server
@@ -1148,17 +1150,13 @@ class KyivstarStreamManager():
             streams = {}
             with channel_state.lock:
                 if channel_state.stream_ids:
-                    for id in channel_state.stream_ids:
-                        stream_info = channel_state.stream_ids[id]
-                        resolution = stream_info['resolution']
-                        bandwidth = stream_info['bandwidth']
-                        stream_inf = '#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s' % (bandwidth, resolution)
-                        streams[id] = type('MockStream', (object,), { 'stream_inf' : stream_inf })()
+                    for id, stream_info in channel_state.stream_ids.items():
+                        stream_inf = '#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s' % (stream_info['bandwidth'], stream_info['resolution'])
+                        streams[id] = MockStream(stream_inf=stream_inf, resolution=None, bandwidth=None)
                 else:
                     for stream_info in self._STREAM_INFOS:
-                        stream = type('MockStream', (object,), stream_info)()
+                        stream = MockStream(**stream_info)
                         streams[channel_state.get_stream_id(stream)] = stream
-
 
         server_address = self.server.server_address
         base_url = f"http://{server_address[0]}:{server_address[1]}/chunklist.m3u8"
