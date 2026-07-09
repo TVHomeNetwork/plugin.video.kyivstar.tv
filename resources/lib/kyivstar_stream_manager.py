@@ -374,6 +374,18 @@ class ChannelState():
         if self.worker_thread.is_alive():
             self.worker_thread.join(timeout=3.0)
 
+    def _calculate_similarity(self, stream_data_1, stream_data_2):
+        def value_sim(val1, val2):
+            if val1 > 0 and val2 > 0:
+                return min(val1, val2) / max(val1, val2)
+            return 1.0 if val1 == val2 else 0.0
+
+        width_sim = value_sim(stream_data_1['width'], stream_data_2['width'])
+        height_sim = value_sim(stream_data_1['height'], stream_data_2['height'])
+        bandwidth_sim = value_sim(stream_data_1['bandwidth'], stream_data_2['bandwidth'])
+
+        return (width_sim + height_sim + bandwidth_sim) / 3.0
+
     def get_stream_id(self, stream):
         stream_info = (stream.resolution, stream.bandwidth)
         with self.lock:
@@ -381,35 +393,33 @@ class ChannelState():
             if stream_id is not None:
                 return stream_id
 
-            stream_id = self.free_stream_id
+            new_stream_id = self.free_stream_id
             self.free_stream_id += 1
-            self.stream_infos[stream_info] = stream_id
-            self.stream_ids[stream_id] = {
-                'resolution': stream_info[0],
-                'bandwidth': stream_info[1],
+            self.stream_infos[stream_info] = new_stream_id
+
+            try:
+                width, height = map(int, stream.resolution.split('x'))
+            except (ValueError, AttributeError):
+                width, height = 0, 0
+
+            new_stream_data = {
+                'resolution': stream.resolution,
+                'bandwidth': int(stream.bandwidth) if stream.bandwidth else 0,
+                'width': width,
+                'height': height,
                 'alternates': []
             }
 
-            for i in self.stream_ids:
-                self.stream_ids[i]['alternates'] = []
-                for j in self.stream_ids:
-                    if j == i or j in self.stream_ids[i]['alternates']:
-                        continue
-                    if self.stream_ids[i]['resolution'] != self.stream_ids[j]['resolution']:
-                        continue
-                    self.stream_ids[i]['alternates'].append(j)
-                for j in self.stream_ids:
-                    if j == i or j in self.stream_ids[i]['alternates']:
-                        continue
-                    if self.stream_ids[i]['bandwidth'] != self.stream_ids[j]['bandwidth']:
-                        continue
-                    self.stream_ids[i]['alternates'].append(j)
-                for j in self.stream_ids:
-                    if j == i or j in self.stream_ids[i]['alternates']:
-                        continue
-                    self.stream_ids[i]['alternates'].append(j)
+            for stream_id, stream_data in self.stream_ids.items():
+                similarity = self._calculate_similarity(stream_data, new_stream_data)
+                if similarity <= 0:
+                    continue
+                sort_key = -similarity
+                bisect.insort(stream_data['alternates'], (sort_key, new_stream_id))
+                bisect.insort(new_stream_data['alternates'], (sort_key, stream_id))
 
-            return stream_id
+            self.stream_ids[new_stream_id] = new_stream_data
+            return new_stream_id
 
     def get_program_list(self, date_index):
         with self.lock:
@@ -525,11 +535,11 @@ class ChannelState():
             if stream_id not in self.stream_ids:
                 xbmc.log("KyivstarStreamManager get_stream: the stream id %s is not found in the stream ids for the asset %s" % (stream_id, self.asset_id), xbmc.LOGERROR)
                 return None
-            for i in self.stream_ids[stream_id]['alternates']:
+            for _, i in self.stream_ids[stream_id]['alternates']:
                 if i in streams:
                     stream_id = i
                     break
-            if stream_id not in streams:
+            else:
                 xbmc.log("KyivstarStreamManager get_stream: streams for the %s program index doesn't contain an alternative stream for the %s id" % (program_index, stream_id), xbmc.LOGERROR)
                 return None
 
