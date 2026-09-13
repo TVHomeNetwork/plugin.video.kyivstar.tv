@@ -245,12 +245,12 @@ class KyivstarHttpServer(object):
     def start(self):
         try:
             port = int(self.service.addon.getSetting('live_stream_server_port'))
-            self.httpd = HTTPServer(('', port), HttpGetHandler)
+            self.httpd = HTTPServer(('127.0.0.1', port), HttpGetHandler)
             self.httpd.service = self.service
             self.httpd.stream_manager = KyivstarStreamManager(self.httpd)
             self.server_thread = threading.Thread(target=self.process)
             self.server_thread.start()
-            xbmc.log("KyivstarHttpServer: started at 0.0.0.0:%s" % port, xbmc.LOGINFO)
+            xbmc.log("KyivstarHttpServer: started at 127.0.0.1:%s" % port, xbmc.LOGINFO)
         except Exception as e:
             xbmc.log("KyivstarHttpServer exception %s" % str(e), xbmc.LOGERROR)
 
