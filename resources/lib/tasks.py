@@ -1,4 +1,5 @@
 import os
+import sys
 import xml.etree.ElementTree as etree
 
 from collections import deque
@@ -401,7 +402,8 @@ class SaveEPGTask(Task):
 
     def _save_epg(self):
         tree = etree.ElementTree(self.xml_root)
-        etree.indent(tree, space="  ", level=0)
+        if sys.version_info[:3] >= (3, 9, 0):
+            etree.indent(tree, space="  ", level=0)
 
         data = '<?xml version="1.0" encoding="utf-8"?>\n'.encode('utf-8') + etree.tostring(self.xml_root, encoding='utf-8')
 
