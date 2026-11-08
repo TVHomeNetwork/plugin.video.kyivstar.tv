@@ -396,9 +396,9 @@ class SaveEPGTask(Task):
                 if channel.catchup and channel.type == 'VIRTUAL':
                     program_attrib['catchup-id'] = str(int(program['start']/1000))
                 xml_program = etree.SubElement(self.xml_root, "programme", attrib=program_attrib)
-                etree.SubElement(xml_program, "title").text = program['title']
+                etree.SubElement(xml_program, "title").text = program.get('title') or ''
                 if service.addon.getSetting('epg_include_description') == 'true':
-                    etree.SubElement(xml_program, "desc").text = strip_html(program['desc'])
+                    etree.SubElement(xml_program, "desc").text = strip_html(program.get('desc'))
 
     def _save_epg(self):
         tree = etree.ElementTree(self.xml_root)
