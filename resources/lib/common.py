@@ -11,4 +11,6 @@ class PinAction:
     SKIP = 2
 
 def strip_html(text):
-    return re.sub('<[^>]*?>', '', text)
+    if not text:
+        return ''
+    return re.sub('<[^>]*?>', '', str(text))
